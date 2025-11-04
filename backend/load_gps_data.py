@@ -38,56 +38,12 @@ def get_lap_gps_data(path: Path, lap: int, chunksize: int = 1000, chunk_limit: i
 
         return lat_df, long_df
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
-
-def get_lap_gps_series(path: Path, lap: int, freq: str = '1S', chunksize: int = 1000, chunk_limit = None):
-    # Assuming `get_lap_gps_data` returns lat_df and lon_df for the specified lap
-    lat_df, lon_df = get_lap_gps_data(path, lap, chunksize=chunksize, chunk_limit=chunk_limit)
-
-    # Convert 'timestamp' columns to datetime
-    lat_times: pd.DatetimeIndex = pd.to_datetime(lat_df['timestamp'])
-    lon_times: pd.DatetimeIndex = pd.to_datetime(lon_df['timestamp'])
-
-    # Get the latitude and longitude values
-    lat_vals: pd.Series[float] = lat_df['telemetry_value']
-    lon_vals: pd.Series[float] = lon_df['telemetry_value']
-
-    # Create DataFrames with datetime as the index
-    lat_df = pd.DataFrame({'timestamp': lat_times, 'lat': lat_vals})
-    lon_df = pd.DataFrame({'timestamp': lon_times, 'lon': lon_vals})
-
-    # Set the timestamp as the index for easy resampling
-    lat_df.set_index('timestamp', inplace=True)
-    lon_df.set_index('timestamp', inplace=True)
-
-    # Create a common time index from the union of lat and lon time ranges
-    time_index = pd.date_range(start=min(lat_df.index.min(), lon_df.index.min()), 
-                               end=max(lat_df.index.max(), lon_df.index.max()), 
-                               freq=freq)  # Adjust freq as needed
-
-    # Reindex lat and lon data to the common time index
-    lat_resampled = lat_df.reindex(time_index, method=None)
-    lon_resampled = lon_df.reindex(time_index, method=None)
-
-    # Interpolate the missing lat and lon values
-    lat_resampled['lat'] = lat_resampled['lat'].interpolate(method='linear')
-    lon_resampled['lon'] = lon_resampled['lon'].interpolate(method='linear')
-
-    # Combine lat and lon into a single DataFrame
-    gps_resampled = pd.DataFrame({
-        'timestamp': time_index,
-        'lat': lat_resampled['lat'],
-        'lon': lon_resampled['lon']
-    })
-
-    return gps_resampled[['timestamp', 'lat', 'lon']]
-
-
 if __name__ == "__main__":
 
     barber_tel_path = data_path / "barber-motorsports-park" / "barber" / "Race 1" / "R1_barber_telemetry_data.csv"
+
+    # NOTE: I haven't resampled timestamps properly for this plot; it is assumed that the frequency and spacing of lat/lon
+    #       data points is identical. This seems to be a decent assumption, by looking at the plots.
 
     # Create the figure and a 3x5 grid of subplots
     fig, axes = plt.subplots(3, 5, figsize=(15, 9))
