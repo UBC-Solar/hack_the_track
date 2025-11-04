@@ -1,0 +1,46 @@
+services:
+  redpanda:
+    image: redpandadata/redpanda:latest
+    command: >
+      redpanda start --overprovisioned --smp 1 --memory 1G
+        --reserve-memory 0M --check=false --node-id 0
+        --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+        --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"   # host access
+    restart: unless-stopped
+
+  
+  tickdb:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: telemetry
+      POSTGRES_DB: telemetry
+    ports:
+      - "5434:5434"              # host access if you want it
+    volumes:
+      - tickdb-data:/var/lib/postgresql/data
+      - ./tickdb-init:/docker-entrypoint-initdb.d  # schema init
+    restart: unless-stopped
+
+  tick-consumer:
+    build:
+      context: .
+      dockerfile: tick-consumer.Dockerfile
+    depends_on:
+      - redpanda
+      - tickdb
+    environment:
+      BROKER: redpanda:9092
+      TOPIC: telem.stream_fast.raw
+      GROUP_ID: tick-snapshots
+      PG_DSN: postgresql://telemetry:telemetry@tickdb:5432/telemetry
+      TICK_TABLE: telem_tick
+      TICK_SECS: "0.1"
+      # Optional: only consider these names (comma-separated). If empty, use all seen names.
+      # NAMES_ALLOWLIST: speed,rpm,lat,lon
+    restart: unless-stopped
+
+volumes:
+  tickdb-data:
