@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: telemetry
       POSTGRES_DB: telemetry
     ports:
-      - "5434:5434"              # host access if you want it
+      - "5432:5432"              # host access if you want it
     volumes:
       - tickdb-data:/var/lib/postgresql/data
       - ./tickdb-init:/docker-entrypoint-initdb.d  # schema init
