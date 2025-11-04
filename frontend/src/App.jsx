@@ -1,18 +1,24 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 function App() {
-  const [message, setMessage] = useState("");
+  const [member, setMember] = useState("[A superposition of all STG members]");
 
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/")
-      .then((res) => res.json())
-      .then((data) => setMessage(data.message));
-  }, []);
+  const selectNewMember = async () => {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/randommember");
+      const data = await response.json();
+      setMember(data.member);  // Update the state with the random member
+    } catch (error) {
+      console.error("Error fetching member:", error);
+    }
+  };
 
   return (
     <div>
-      <h1>React + FastAPI Demo</h1>
-      <p>{message}</p>
+      <h1>UBC Solar x Hack the Track</h1>
+      <p>Click the button to choose a random STG member!</p>
+      <button onClick={selectNewMember}>Get Random Member</button>
+      <p>Chosen member: {member}</p>
     </div>
   );
 }
