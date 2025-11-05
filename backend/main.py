@@ -22,7 +22,9 @@ def read_root():
 @app.get("/laps/")
 def get_example_lap(lapNumber: int, samplePeriod: int = 1):
 
-    lat_df, lon_df = get_lap_gps_data(data_path, lapNumber, chunksize=100000, chunk_limit=None)
+    barber_tel_path = data_path / "barber-motorsports-park" / "barber" / "Race 1" / "R1_barber_telemetry_data.csv"
+
+    lat_df, lon_df = get_lap_gps_data(barber_tel_path, lapNumber, chunksize=100000, chunk_limit=None)
 
     # Validate the data
     # assert lat_df['telemetry_name'].unique() == ['VBOX_Lat_Min']

@@ -4,11 +4,15 @@
 import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
+from os.path import isfile
 
-data_path = Path(r"C:\Users\Jonah\Documents\UBCSolar\2025\hack_the_track\backend\fastapi\data\race_data")
+data_path = Path(r"C:\Users\Jonah\Documents\UBCSolar\2025\hack_the_track\backend\data\race_data")
 
 def get_lap_gps_data(path: Path, lap: int, chunksize: int = 1000, chunk_limit: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-        reader = pd.read_csv(path, chunksize=chunksize)
+        if isfile(path):
+            reader = pd.read_csv(path, chunksize=chunksize)
+        else:
+            raise ValueError(f"Path {path} must be a valid file!")
 
         lat_df = None
         long_df = None
