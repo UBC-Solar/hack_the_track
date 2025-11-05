@@ -5,7 +5,7 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-data_path = Path(r"C:\Users\Jonah\Documents\UBCSolar\2025\hack_the_track\backend\data\race_data\barber-motorsports-park\barber\Race 1\R1_barber_telemetry_data.csv")
+data_path = Path(r"C:\Users\Jonah\Documents\UBCSolar\2025\hack_the_track\backend\fastapi\data\race_data")
 
 def get_lap_gps_data(path: Path, lap: int, chunksize: int = 1000, chunk_limit: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         reader = pd.read_csv(path, chunksize=chunksize)
