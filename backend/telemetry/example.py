@@ -12,3 +12,13 @@ if car:
     print("Available telemetry signals:", car.list_telemetry_names())
     df = car.get_telemetry("accx_can")
     print(df.head())
+
+
+#car 1 might be faulty, did not really finish lap2
+
+
+#consider state and control inputs
+
+
+
+

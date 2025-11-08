@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import Optional, List
 from sqlalchemy import create_engine, text
 import pandas as pd
+
+
 from telemetry.raw import VehicleRaceRecord
 
 

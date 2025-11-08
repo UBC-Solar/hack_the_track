@@ -5,10 +5,10 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-data_path = Path(r"C:\Users\Jonah\Documents\UBCSolar\2025\hack_the_track\backend\data\race_data\barber-motorsports-park\barber\Race 1\R1_barber_telemetry_data.csv")
+data_path = Path(r"C:\Users\sanar\PycharmProjects\hack_the_track\backend\R1_barber_telemetry_data.csv")
 
 def get_lap_gps_data(path: Path, lap: int, chunksize: int = 1000, chunk_limit: int | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
-        reader = pd.read_csv(path, chunksize=chunksize)
+        reader = pd.read_csv(r"C:\Users\sanar\PycharmProjects\hack_the_track\backend\R1_barber_telemetry_data.csv", chunksize=chunksize)
 
         lat_df = None
         long_df = None
@@ -41,10 +41,10 @@ def get_lap_gps_data(path: Path, lap: int, chunksize: int = 1000, chunk_limit: i
 if __name__ == "__main__":
 
     barber_tel_path = data_path / "barber-motorsports-park" / "barber" / "Race 1" / "R1_barber_telemetry_data.csv"
-
-    # NOTE: I haven't resampled timestamps properly for this plot; it is assumed that the frequency and spacing of lat/lon
-    #       data points is identical. This seems to be a decent assumption, by looking at the plots.
-
+#
+#     # NOTE: I haven't resampled timestamps properly for this plot; it is assumed that the frequency and spacing of lat/lon
+#     #       data points is identical. This seems to be a decent assumption, by looking at the plots.
+#
     # Create the figure and a 3x5 grid of subplots
     fig, axes = plt.subplots(3, 5, figsize=(15, 9))
 
@@ -80,4 +80,5 @@ if __name__ == "__main__":
     # Adjust layout to prevent overlapping
     plt.tight_layout()
     plt.show()
+
 
