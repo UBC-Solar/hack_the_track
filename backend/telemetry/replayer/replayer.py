@@ -67,6 +67,10 @@ def main():
         return
 
     first_ts = rows[0]["ts"]
+    print(f"First Row: {rows[0]['ts']}\n")
+    print(f"Last Row: {rows[-1]['ts']}\n")
+    input("Continue?")
+
     if isinstance(first_ts, str):
         first_ts = dt.datetime.fromisoformat(first_ts)
     start = dt.datetime.now(dt.timezone.utc)
