@@ -213,12 +213,14 @@ def run():
             msg = data_consumer.poll(timeout=0.01)
             if msg is not None:
                 if msg.error():
-                    raise KafkaException(msg.error())
+                    print(f"[tick] Error: {msg.error()}")
+                    time.sleep(1)
+
                 try:
                     payload = json.loads(msg.value())
                     vid = int(payload.get("vehicle_id"))
                     name = str(payload.get("telemetry_name"))
-                    val  = to_float_or_none(payload.get("telemetry_value"))
+                    val = to_float_or_none(payload.get("telemetry_value"))
 
                     if not (NAMES_ALLOWLIST and name not in NAMES_ALLOWLIST):
                         latest_by_vehicle.setdefault(vid, {})[name] = val
