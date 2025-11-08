@@ -8,6 +8,12 @@ services:
         --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
     ports:
       - "19092:19092"   # host access
+    volumes:
+      - type: tmpfs
+        target: /var/lib/redpanda/data
+        tmpfs:
+          size: 1073741824   # 1 GiB (adjust)
+          mode: 0777         # <-- allow redpanda user to write
     restart: unless-stopped
 
   
@@ -38,8 +44,14 @@ services:
       PG_DSN: postgresql://telemetry:telemetry@tickdb:5432/telemetry
       TICK_TABLE: telem_tick
       TICK_SECS: "0.1"
-      # Optional: only consider these names (comma-separated). If empty, use all seen names.
-      # NAMES_ALLOWLIST: speed,rpm,lat,lon
+      WIPE_ON_START: "true"          # do it at consumer startup
+      WIPE_TABLES: "telem_tick"      # comma-separated if >1
+      CONTROL_TOPIC: tick.control
+      CONTROL_TOPIC_CREATE: "true"
+      CONTROL_TOPIC_PARTITIONS: "1"
+      CONTROL_TOPIC_REPLICATION: "1"
+      CONTROL_TOPIC_COMPACT: "true"   # optional: compacted control topic
+      BROKER_READY_TIMEOUT_SECS: "45"
     restart: unless-stopped
 
 volumes:
