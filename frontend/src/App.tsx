@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import FloatingForm from './components/FloatingForm';
+import TickConsumerToggle from './components/TickConsumerToggle';
 
 const position: LatLngTuple = [33.5325017, -86.6215766];
 
@@ -12,38 +13,25 @@ export default function App() {
   const [gpsData, setGpsData] = useState<{ lat_vals: number[]; lon_vals: number[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle lapNumber change
   const handleLapNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove leading zeros
     const value = e.target.value;
-    const cleanedValue = value.replace(/^0+/, '') || '0';  // Ensure it's not empty
-
+    const cleanedValue = value.replace(/^0+/, '') || '0';
     setLapNumber(parseInt(cleanedValue, 10));
   };
 
-  // Handle samplePeriod change
   const handleSamplePeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setSamplePeriod(Number(value));  // No leading zero issue here since it's a numeric input
+    setSamplePeriod(Number(value));
   };
 
   const fetchGpsData = async () => {
     try {
       const response = await fetch(`http://localhost:8000/laps/?lapNumber=${lapNumber}&samplePeriod=${samplePeriod}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch data. Status: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Failed to fetch data. Status: ${response.status}`);
       const data = await response.json();
-
-      if (!data.lat_vals || !data.lon_vals) {
-        throw new Error('Invalid data structure: Missing lat_vals or lon_vals');
-      }
-
+      if (!data.lat_vals || !data.lon_vals) throw new Error('Invalid data structure: Missing lat_vals or lon_vals');
       setGpsData(data);
       setError(null);
-
     } catch (error: any) {
       console.error('Error fetching GPS data:', error);
       setError(error.message);
@@ -57,7 +45,7 @@ export default function App() {
   };
 
   const polylineCoordinates = gpsData
-    ? gpsData.lat_vals.map((lat, index) => [lat, gpsData.lon_vals[index]] as LatLngTuple)
+    ? gpsData.lat_vals.map((lat, i) => [lat, gpsData.lon_vals[i]] as LatLngTuple)
     : [];
 
   return (
@@ -70,6 +58,8 @@ export default function App() {
         onLapNumberChange={handleLapNumberChange}
         onSamplePeriodChange={handleSamplePeriodChange}
       />
+
+      <TickConsumerToggle backendUrl="http://localhost:8000" />
 
       <MapContainer
         center={position}

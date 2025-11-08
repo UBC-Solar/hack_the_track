@@ -22,7 +22,7 @@ CONTROL_TOPIC_REPLICATION = int(os.getenv("CONTROL_TOPIC_REPLICATION", "1"))
 CONTROL_TOPIC_COMPACT = os.getenv("CONTROL_TOPIC_COMPACT", "false").lower() == "true"
 BROKER_READY_TIMEOUT_SECS = float(os.getenv("BROKER_READY_TIMEOUT_SECS", "45"))
 
-WRITE_ENABLED = True   # default: writing on
+WRITE_ENABLED = False   # default: writing on
 
 WIPE_ON_START = os.getenv("WIPE_ON_START", "false").lower() == "true"
 WIPE_TABLES = [t.strip() for t in os.getenv("WIPE_TABLES","").split(",") if t.strip()]
@@ -135,21 +135,38 @@ def make_consumer(group_id: str, topics: list[str], reset="latest") -> Consumer:
         "auto.offset.reset": reset,
     })
 
+
 def poll_control(ctrl_consumer) -> None:
     """Poll control topic non-blocking and toggle WRITE_ENABLED."""
     global WRITE_ENABLED
     msg = ctrl_consumer.poll(timeout=0.0)
     if not msg or msg.error():
         return
+
     try:
         payload = json.loads(msg.value())
-        cmd = str(payload.get("cmd", "")).lower()
-        if cmd in ("pause", "stop", "off"):
+        # Normalize keys to lowercase for robustness
+        keys = {k.lower(): k for k in payload.keys()}
+        cmd = str(payload.get(keys.get("cmd", ""), "")).lower() if "cmd" in keys else ""
+        write_enabled = payload.get(keys.get("write_enabled", ""), None)
+
+        # Preferred path: handle boolean-style messages
+        if isinstance(write_enabled, bool):
+            WRITE_ENABLED = write_enabled
+            state = "enabled" if WRITE_ENABLED else "disabled"
+            print(f"[control] write {state} (via write_enabled={WRITE_ENABLED})")
+
+        # Legacy command-style messages
+        elif cmd in ("pause", "stop", "off"):
             WRITE_ENABLED = False
-            print("[control] write disabled")
+            print("[control] write disabled (via cmd)")
         elif cmd in ("resume", "start", "on"):
             WRITE_ENABLED = True
-            print("[control] write enabled")
+            print("[control] write enabled (via cmd)")
+
+        else:
+            print(f"[control] unknown message: {payload}")
+
     except Exception as e:
         print(f"[control] bad control message: {e}")
 
@@ -196,12 +213,14 @@ def run():
             msg = data_consumer.poll(timeout=0.01)
             if msg is not None:
                 if msg.error():
-                    raise KafkaException(msg.error())
+                    print(f"[tick] Error: {msg.error()}")
+                    time.sleep(1)
+
                 try:
                     payload = json.loads(msg.value())
                     vid = int(payload.get("vehicle_id"))
                     name = str(payload.get("telemetry_name"))
-                    val  = to_float_or_none(payload.get("telemetry_value"))
+                    val = to_float_or_none(payload.get("telemetry_value"))
 
                     if not (NAMES_ALLOWLIST and name not in NAMES_ALLOWLIST):
                         latest_by_vehicle.setdefault(vid, {})[name] = val

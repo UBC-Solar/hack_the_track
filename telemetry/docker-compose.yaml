@@ -16,7 +16,6 @@ services:
           mode: 0777         # <-- allow redpanda user to write
     restart: unless-stopped
 
-  
   tickdb:
     image: postgres:16
     environment:

@@ -7,20 +7,11 @@ WORKDIR /app
 # Install dependencies first for caching
 COPY pyproject.toml uv.lock ./
 
+COPY load_gps_data.py main.py telemetry/ ./
+
 # Use uv to sync dependencies (no dev deps for production)
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
-
-# Copy the rest of the app
-COPY . .
-
-# Ensure executables are available
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Switch to a non-root user for security
-RUN groupadd --system --gid 999 nonroot \
- && useradd --system --gid 999 --uid 999 --create-home nonroot
-USER nonroot
 
 # Expose port and run
 EXPOSE 8000
