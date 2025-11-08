@@ -1,4 +1,5 @@
 from telemetry.raw.TelemetryDB import TelemetryDB
+from matplotlib import pyplot as plt
 
 db = TelemetryDB("postgresql+psycopg2://racer:changeme@100.120.36.75:5432/racing")
 
@@ -22,6 +23,8 @@ if car:
 
 
 #car 1 might be faulty, did not really finish lap2
+
+df_ath.head()
 
 
 
