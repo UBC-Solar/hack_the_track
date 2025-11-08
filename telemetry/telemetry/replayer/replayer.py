@@ -95,6 +95,9 @@ def main():
             "track": r["track"],
             "vehicle_number": r["vehicle_number"],
         }
+
+        print(f"Sending to Kafka: {json.dumps(payload)}")
+
         producer.produce(
             topic=TOPIC,
             key=str(r["vehicle_id"]),            # keeps per-vehicle ordering

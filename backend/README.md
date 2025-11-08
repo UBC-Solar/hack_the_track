@@ -1,6 +1,6 @@
 # Backend
 
-To start the backend, enter the backend directory and start uvicorn.
+To start the backend, enter the fastapi directory and start uvicorn.
 
 ```
 cd backend
