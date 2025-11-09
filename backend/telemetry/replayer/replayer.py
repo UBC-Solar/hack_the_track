@@ -1,19 +1,21 @@
 import os, time, json, datetime as dt, decimal
+from dotenv import load_dotenv
 from confluent_kafka import Producer
 from sqlalchemy import create_engine, text
-from dotenv import load_dotenv
 
 load_dotenv()
 
-BROKER = os.getenv("BROKER")
-TOPIC  = os.getenv("TOPIC")
-DATABASE_URL = os.environ["DATABASE_URL"]
-VEHICLE_ID = int(os.getenv("VEHICLE_ID"))
-RACE_NUMBER = int(os.getenv("RACE_NUMBER"))
-TRACK_NAME = os.getenv("TRACK_NAME")  # required for partition pruning
-SPEED = float(os.getenv("SPEED_MULTIPLIER"))
+BROKER        = os.getenv("BROKER")
+TOPIC         = os.getenv("TOPIC")
+DATABASE_URL  = os.environ["DATABASE_URL"]
+RACE_NUMBER   = int(os.getenv("RACE_NUMBER"))
+TRACK_NAME    = os.getenv("TRACK_NAME")  # required
+SPEED         = float(os.getenv("SPEED_MULTIPLIER"))
 
-# ---------------------------------------------------------------------
+# Optional: if you set VEHICLE_ID, we'll filter to that one; otherwise ALL vehicles
+VEHICLE_ID_ENV = os.getenv("VEHICLE_ID")
+VEHICLE_ID     = int(VEHICLE_ID_ENV) if VEHICLE_ID_ENV not in (None, "", "None") else None
+
 def delivery_report(err, msg):
     if err:
         print(f"❌ Delivery failed: {err}")
@@ -27,14 +29,39 @@ producer_conf = {
 }
 producer = Producer(producer_conf)
 
-def load_rows():
+def get_time_bounds():
     if not TRACK_NAME:
-        raise RuntimeError("TRACK_NAME env var must be set (e.g. TRACK_NAME='circuit-of-the-americas').")
+        raise RuntimeError("TRACK_NAME must be set (e.g. TRACK_NAME='circuit-of-the-americas').")
 
     engine = create_engine(DATABASE_URL, future=True)
     with engine.connect() as con:
-        # Query parent table; partition pruning will hit the right child.
-        sql = text("""
+        params = {"r": RACE_NUMBER, "t": TRACK_NAME}
+        veh_clause = ""
+        if VEHICLE_ID is not None:
+            veh_clause = "AND f.vehicle_id = :v"
+            params["v"] = VEHICLE_ID
+
+        q = text(f"""
+            SELECT MIN(f.timestamp) AS tmin, MAX(f.timestamp) AS tmax, COUNT(*) AS n
+            FROM telem.stream_fast f
+            JOIN telem.event e ON e.id = f.event_id
+            WHERE e.race_number = :r AND e.track_name = :t
+            {veh_clause}
+        """)
+        row = con.execute(q, params).mappings().first()
+        return row["tmin"], row["tmax"], row["n"]
+
+def stream_rows():
+    """Yield rows in timestamp order for the whole race (optionally one vehicle)."""
+    engine = create_engine(DATABASE_URL, future=True)
+    with engine.connect().execution_options(stream_results=True, yield_per=50_000) as con:
+        params = {"r": RACE_NUMBER, "t": TRACK_NAME}
+        veh_clause = ""
+        if VEHICLE_ID is not None:
+            veh_clause = "AND f.vehicle_id = :v"
+            params["v"] = VEHICLE_ID
+
+        sql = text(f"""
             SELECT
                 f.vehicle_id,
                 e.race_number,
@@ -47,13 +74,14 @@ def load_rows():
             JOIN telem.event   e ON e.id = f.event_id
             JOIN telem.tname   n ON n.id = f.name_id
             JOIN telem.vehicle v ON v.id = f.vehicle_id
-            WHERE f.vehicle_id   = :v
-              AND e.race_number  = :r
-              AND e.track_name   = :t
+            WHERE e.race_number = :r
+              AND e.track_name  = :t
+              {veh_clause}
             ORDER BY f.timestamp ASC
         """)
-        rows = con.execute(sql, {"v": VEHICLE_ID, "r": int(RACE_NUMBER), "t": TRACK_NAME}).mappings().all()
-    return rows
+        result = con.execute(sql, params)
+        for r in result.mappings():
+            yield r
 
 def to_json_safe(v):
     if isinstance(v, (dt.datetime, dt.date)): return v.isoformat()
@@ -61,23 +89,24 @@ def to_json_safe(v):
     return v
 
 def main():
-    rows = load_rows()
-    if not rows:
+    tmin, tmax, nrows = get_time_bounds()
+    if not tmin or nrows == 0:
         print("No rows found.")
         return
 
-    first_ts = rows[0]["ts"]
-    print(f"First Row: {rows[0]['ts']}\n")
-    print(f"Last Row: {rows[-1]['ts']}\n")
-    input("Continue?")
+    print(f"Rows: {nrows}")
+    print(f"First Row ts: {tmin}")
+    print(f"Last  Row ts: {tmax}")
+    input("Continue? ")
 
-    if isinstance(first_ts, str):
-        first_ts = dt.datetime.fromisoformat(first_ts)
+    # pacing anchors
+    first_ts = tmin if not isinstance(tmin, str) else dt.datetime.fromisoformat(tmin)
     start = dt.datetime.now(dt.timezone.utc)
 
-    print(f"Streaming {len(rows)} rows (speed×{SPEED}) …")
+    scope = f"ALL vehicles" if VEHICLE_ID is None else f"vehicle_id={VEHICLE_ID}"
+    print(f"Streaming {nrows} rows for race #{RACE_NUMBER} @ {TRACK_NAME} ({scope}) (speed×{SPEED}) …")
 
-    for r in rows:
+    for r in stream_rows():
         ts = r["ts"]
         if isinstance(ts, str):
             ts = dt.datetime.fromisoformat(ts)
@@ -100,12 +129,13 @@ def main():
             "vehicle_number": r["vehicle_number"],
         }
 
-        print(f"Sending to Kafka: {json.dumps(payload)}")
+        # optional debug print:
+        # print(f"Sending to Kafka: {json.dumps(payload)}")
 
         producer.produce(
             topic=TOPIC,
-            key=str(r["vehicle_id"]),            # keeps per-vehicle ordering
-            value=json.dumps(payload),           # JSON payload
+            key=str(r["vehicle_id"]),     # preserves per-vehicle ordering
+            value=json.dumps(payload),
             on_delivery=delivery_report,
         )
         producer.poll(0)
