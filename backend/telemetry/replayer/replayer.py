@@ -49,31 +49,39 @@ def get_time_bounds():
             clauses.append("f.vehicle_id = :v")
             params["v"] = VEHICLE_ID
 
+        excl_bind = None
         if EXCLUDE_VEHICLE_IDS:
-            # expanding bindparam for NOT IN (...)
-            excl = bindparam("excl_ids", expanding=True)
-            where_sql = " AND ".join(clauses + [f"f.vehicle_id NOT IN :excl_ids"])
-            q = text(f"""
-                SELECT MIN(f.timestamp) AS tmin, MAX(f.timestamp) AS tmax, COUNT(*) AS n
-                FROM telem.stream_fast f
-                JOIN telem.event e ON e.id = f.event_id
-                WHERE {where_sql}
-            """).bindparams(excl)
-            row = con.execute(q, {"excl_ids": EXCLUDE_VEHICLE_IDS, **params}).mappings().first()
-        else:
-            where_sql = " AND ".join(clauses)
-            q = text(f"""
-                SELECT MIN(f.timestamp) AS tmin, MAX(f.timestamp) AS tmax, COUNT(*) AS n
-                FROM telem.stream_fast f
-                JOIN telem.event e ON e.id = f.event_id
-                WHERE {where_sql}
-            """)
-            row = con.execute(q, params).mappings().first()
+            excl_bind = bindparam("excl_ids", expanding=True)
+            clauses.append("f.vehicle_id NOT IN :excl_ids")
 
+        where_sql = " AND ".join(clauses)
+        sql = f"""
+            WITH base AS (
+              SELECT
+                COALESCE(
+                  f.relative_time_s,
+                  EXTRACT(EPOCH FROM (f."timestamp" - MIN(f."timestamp") OVER (PARTITION BY f.event_id, f.vehicle_id)))
+                ) AS rtime
+              FROM telem.stream_fast f
+              JOIN telem.event e ON e.id = f.event_id
+              WHERE {where_sql}
+            )
+            SELECT MIN(rtime) AS tmin, MAX(rtime) AS tmax, COUNT(*) AS n FROM base;
+        """
+        stmt = text(sql)
+        if excl_bind is not None:
+            stmt = stmt.bindparams(excl_bind)
+
+        exec_params = {**params}
+        if EXCLUDE_VEHICLE_IDS:
+            exec_params["excl_ids"] = EXCLUDE_VEHICLE_IDS
+
+        row = con.execute(stmt, exec_params).mappings().first()
         return row["tmin"], row["tmax"], row["n"]
 
+
 def stream_rows():
-    """Yield rows in timestamp order for the whole race (optionally one vehicle), excluding bad IDs."""
+    """Yield rows ordered by per-vehicle relative time (seconds since that vehicle's first ts)."""
     engine = create_engine(DATABASE_URL, future=True)
     with engine.connect().execution_options(stream_results=True, yield_per=50_000) as con:
         params = {"r": RACE_NUMBER, "t": TRACK_NAME}
@@ -89,21 +97,26 @@ def stream_rows():
             clauses.append("f.vehicle_id NOT IN :excl_ids")
 
         where_sql = " AND ".join(clauses)
+        # rtime: use stored relative_time_s; fallback to windowed min(ts) if any legacy rows exist
         sql_txt = f"""
             SELECT
                 f.vehicle_id,
                 e.race_number,
                 n.name        AS telemetry_name,
                 f.value       AS telemetry_value,
-                f.timestamp   AS ts,
+                f."timestamp" AS ts,
                 e.track_name  AS track,
-                v.code        AS vehicle_number
+                v.code        AS vehicle_number,
+                COALESCE(
+                  f.relative_time_s,
+                  EXTRACT(EPOCH FROM (f."timestamp" - MIN(f."timestamp") OVER (PARTITION BY f.event_id, f.vehicle_id)))
+                ) AS rtime
             FROM telem.stream_fast f
             JOIN telem.event   e ON e.id = f.event_id
             JOIN telem.tname   n ON n.id = f.name_id
             JOIN telem.vehicle v ON v.id = f.vehicle_id
             WHERE {where_sql}
-            ORDER BY f.timestamp ASC
+            ORDER BY rtime ASC, f.vehicle_id ASC, f."timestamp" ASC
         """
 
         stmt = text(sql_txt)
@@ -118,37 +131,35 @@ def stream_rows():
         for r in result.mappings():
             yield r
 
+
 def to_json_safe(v):
     if isinstance(v, (dt.datetime, dt.date)): return v.isoformat()
     if isinstance(v, decimal.Decimal): return float(v)
     return v
 
+
 def main():
     tmin, tmax, nrows = get_time_bounds()
-    if not tmin or nrows == 0:
+    if not (tmax is not None) or nrows == 0:
         print("No rows found.")
         return
 
     print(f"Rows: {nrows}")
-    print(f"First Row ts: {tmin}")
-    print(f"Last  Row ts: {tmax}")
+    # These are relative seconds
+    print(f"First relative time: {tmin:.6f} s")
+    print(f"Last  relative time: {tmax:.6f} s (duration)")
     input("Continue? ")
 
-    # pacing anchors
-    first_ts = tmin if not isinstance(tmin, str) else dt.datetime.fromisoformat(tmin)
     start = dt.datetime.now(dt.timezone.utc)
 
     scope = f"ALL vehicles" if VEHICLE_ID is None else f"vehicle_id={VEHICLE_ID}"
     print(f"Streaming {nrows} rows for race #{RACE_NUMBER} @ {TRACK_NAME} ({scope}) (speed×{SPEED}) …")
 
     for r in stream_rows():
-        ts = r["ts"]
-        if isinstance(ts, str):
-            ts = dt.datetime.fromisoformat(ts)
+        rtime = float(r["rtime"])  # seconds since that vehicle's first timestamp
 
-        # pacing
-        orig_elapsed = (ts - first_ts).total_seconds()
-        target_elapsed = orig_elapsed / max(SPEED, 1e-9)
+        # pacing (align all vehicles to start together at t=0)
+        target_elapsed = rtime / max(SPEED, 1e-9)
         now_elapsed = (dt.datetime.now(dt.timezone.utc) - start).total_seconds()
         delay = target_elapsed - now_elapsed
         if delay > 0:
@@ -159,13 +170,11 @@ def main():
             "race_number": r["race_number"],
             "telemetry_name": r["telemetry_name"],
             "telemetry_value": to_json_safe(r["telemetry_value"]),
-            "ts": to_json_safe(ts),
+            "ts": to_json_safe(r["ts"]),                  # original timestamp (for reference)
+            "relative_time_s": rtime,                     # NEW: explicit in payload
             "track": r["track"],
             "vehicle_number": r["vehicle_number"],
         }
-
-        # optional debug print:
-        # print(f"Sending to Kafka: {json.dumps(payload)}")
 
         producer.produce(
             topic=TOPIC,
@@ -176,7 +185,8 @@ def main():
         producer.poll(0)
 
     producer.flush()
-    print("✅ Replay finished.")
+    print("Replay finished.")
+
 
 if __name__ == "__main__":
     main()
