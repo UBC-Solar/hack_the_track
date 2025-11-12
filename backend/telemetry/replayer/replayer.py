@@ -107,6 +107,7 @@ def stream_rows():
                 f."timestamp" AS ts,
                 e.track_name  AS track,
                 v.code        AS vehicle_number,
+                f.lap         AS lap,
                 COALESCE(
                   f.relative_time_s,
                   EXTRACT(EPOCH FROM (f."timestamp" - MIN(f."timestamp") OVER (PARTITION BY f.event_id, f.vehicle_id)))
@@ -174,6 +175,7 @@ def main():
             "relative_time_s": rtime,                     # NEW: explicit in payload
             "track": r["track"],
             "vehicle_number": r["vehicle_number"],
+            "lap": int(r["lap"]) if r["lap"] is not None else None,
         }
 
         producer.produce(
