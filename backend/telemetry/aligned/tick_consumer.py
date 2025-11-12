@@ -26,8 +26,29 @@ WRITE_ENABLED = False   # default: writing on
 
 WIPE_ON_START = os.getenv("WIPE_ON_START", "false").lower() == "true"
 WIPE_TABLES = [t.strip() for t in os.getenv("WIPE_TABLES","").split(",") if t.strip()]
+LAP_COLUMN = "lap"
+
 
 # --- Helpers: broker/topic bootstrap -----------------------------------------
+
+latest_by_vehicle: Dict[int, Dict[str, Optional[float]]] = {}
+
+# NEW: latest *lap* (vehicle_id -> lap int)
+latest_lap_by_vehicle: Dict[int, Optional[int]] = {}
+
+# Set of all telemetry names observed (filtered by allowlist if provided)
+observed_names: Set[str] = set()
+
+
+def to_int_or_none(v):
+    try:
+        # allow floats that are whole numbers, strings like "12", etc.
+        iv = int(float(v))
+        return iv
+    except Exception:
+        return None
+
+
 def wait_for_broker(brokers: str, timeout_s: float = 30.0) -> None:
     """Poll metadata until the broker responds or timeout."""
     start = time.monotonic()
@@ -68,6 +89,7 @@ def ensure_topic(brokers: str, name: str, partitions: int, replication: int, com
             return
         print(f"[control] topic create warning for {name}: {e}")
 
+
 # --- DB helpers ---------------------------------------------------------------
 def wipe_tables(conn):
     if not WIPE_TABLES:
@@ -78,6 +100,7 @@ def wipe_tables(conn):
             print(f"[wipe] truncated {t}")
     conn.commit()
 
+
 def to_float_or_none(v):
     if isinstance(v, (int, float)):
         return float(v)
@@ -85,6 +108,29 @@ def to_float_or_none(v):
         return float(str(v))
     except Exception:
         return None
+
+
+def ensure_lap_column(conn):
+    """Ensure the 'lap' column exists as INTEGER (nullable)."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = %s
+              AND table_schema = current_schema()
+              AND column_name = %s
+        """, (TICK_TABLE, LAP_COLUMN))
+        exists = cur.fetchone() is not None
+        if not exists:
+            cur.execute(
+                sql.SQL("ALTER TABLE {} ADD COLUMN {} integer NULL").format(
+                    sql.Identifier(TICK_TABLE),
+                    sql.Identifier(LAP_COLUMN)
+                )
+            )
+            print(f"[schema] Added column {LAP_COLUMN} (INTEGER)")
+    conn.commit()
+
 
 def ensure_columns(conn, names: Set[str]):
     """Add columns to wide table if they don't exist. Columns are double precision."""
@@ -108,6 +154,7 @@ def ensure_columns(conn, names: Set[str]):
             print(f"[schema] Added column {n}")
     conn.commit()
 
+
 def upsert_tick(conn, ts: dt.datetime, vehicle_id: int, row: Dict[str, Optional[float]]):
     """Insert/Upsert one row: (ts, vehicle_id, <telemetry columns...>)."""
     with conn.cursor() as cur:
@@ -125,6 +172,7 @@ def upsert_tick(conn, ts: dt.datetime, vehicle_id: int, row: Dict[str, Optional[
                 sql.SQL(" WHERE ts = %s AND vehicle_id = %s")
             cur.execute(q, (*values, ts, vehicle_id))
     conn.commit()
+
 
 # --- Kafka consumers ----------------------------------------------------------
 def make_consumer(group_id: str, topics: list[str], reset="latest") -> Consumer:
@@ -172,8 +220,10 @@ def poll_control(ctrl_consumer) -> None:
 
 # Holds the latest value by (vehicle_id -> {name: value})
 latest_by_vehicle: Dict[int, Dict[str, Optional[float]]] = {}
+
 # Set of all telemetry names observed (filtered by allowlist if provided)
 observed_names: Set[str] = set()
+
 
 # --- Main loop ----------------------------------------------------------------
 def run():
@@ -222,6 +272,10 @@ def run():
                     name = str(payload.get("telemetry_name"))
                     val = to_float_or_none(payload.get("telemetry_value"))
 
+                    lap = to_int_or_none(payload.get("lap"))
+                    if lap is not None:
+                        latest_lap_by_vehicle[vid] = lap
+
                     if not (NAMES_ALLOWLIST and name not in NAMES_ALLOWLIST):
                         latest_by_vehicle.setdefault(vid, {})[name] = val
                         observed_names.add(name)
@@ -235,11 +289,17 @@ def run():
 
                 # ensure schema columns exist for observed signals
                 ensure_columns(conn, observed_names)
+                ensure_lap_column(conn)
 
                 # write per-vehicle row (only if enabled)
                 if WRITE_ENABLED:
                     for vid, m in latest_by_vehicle.items():
                         row = {k: v for k, v in m.items() if v is not None}
+
+                        lap_val = latest_lap_by_vehicle.get(vid)
+                        if lap_val is not None:
+                            row[LAP_COLUMN] = lap_val
+
                         upsert_tick(conn, wall_ts, vid, row)
 
                 # always advance the tick, even if paused
