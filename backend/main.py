@@ -1,6 +1,6 @@
 # backend/main.py
 from fastapi import FastAPI, HTTPException
-from sqlalchemy import create_engine, MetaData, Table, select, desc
+from sqlalchemy import create_engine, MetaData, Table, select, desc, text
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -51,6 +51,42 @@ def get_latest_row():
             if not result:
                 raise HTTPException(status_code=404, detail="No telemetry data found")
             return dict(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/latestAll")
+def get_latest_row():
+    try:
+        with engine.connect() as conn:
+
+            # Get a table with rows containing the most recent lat/lon for each distinct vehicle
+            sql_txt = f"""
+                select * from (
+                    select
+                        ts,
+                        vehicle_id,
+                        "VBOX_Lat_Min",
+                        "VBOX_Long_Minutes",
+                        row_number() over(partition by vehicle_id order by ts desc) as rn
+                    from
+                        telem_tick
+                ) t
+                where t.rn = 1
+            """
+            stmt = text(sql_txt)
+
+            result = conn.execute(stmt).mappings().fetchall()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="No telemetry data found")
+
+            # Create a mapping from vehicle ids to most recent position
+
+            veh_locations: dict[int, tuple[float, float]] = {
+                veh_row['vehicle_id']: (veh_row['VBOX_Lat_Min'], veh_row['VBOX_Long_Minutes']) for veh_row in result
+            }
+
+            return veh_locations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -114,4 +150,4 @@ def toggle_tick_consumer(payload: TogglePayload):
 
 
 if __name__ == "__main__":
-    print(get_example_lap(4))
+    print(get_latest_row())

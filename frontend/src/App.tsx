@@ -23,12 +23,12 @@ export default function App() {
 
   const fetchLatestPosition = async () => {
     try {
-      const response = await fetch('http://localhost:8000/latest/');
+      const response = await fetch('http://localhost:8000/latestAll/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
       console.log(data)
       if (data.VBOX_Lat_Min === null || data.VBOX_Long_Minutes === null) throw new Error('Invalid position data');
-      setLatestPosition([data.VBOX_Lat_Min, data.VBOX_Long_Minutes]);
+      setLatestPositions(data);
     } catch (error: any) {
       console.error('Error fetching latest position:', error);
     }
@@ -46,6 +46,7 @@ export default function App() {
     // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
   }, []); // Empty dependency array to run the effect only once on mount
+
 
   // Update position history when new position is fetched
   // useEffect(() => {
@@ -93,7 +94,7 @@ export default function App() {
 
         {/* Display only the newest position as a marker */}
         {latestPositions && (
-          <VehicleMarkers positions={latestPositions}}/>
+          <VehicleMarkers positions={latestPositions}/>
         )}
       </MapContainer>
     </div>
