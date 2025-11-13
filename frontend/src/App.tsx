@@ -61,7 +61,7 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []); // Empty dependency array to run the effect only once on mount
 
-// Increments the timer
+// Increments the timer (THIS WILL BE DELETED LATER !!!)
   useEffect(() => {
     const intervalId = setInterval(() => {
       setCurrentTime(prev => parseFloat((prev + 0.1).toFixed(1)));
