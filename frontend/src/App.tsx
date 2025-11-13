@@ -1,9 +1,10 @@
 // src/App.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import FloatingForm from './components/FloatingForm';
 import TickConsumerToggle from './components/TickConsumerToggle';
+import LapDisplay from './components/LapsDisplay';
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
@@ -12,6 +13,16 @@ export default function App() {
   const [samplePeriod, setSamplePeriod] = useState<number>(1);
   const [error, setError] = useState<string | null>(null);
   const [latestPosition, setLatestPosition] = useState<LatLngTuple | null>(null); // Store the latest position
+
+  // Mocked values for back end 
+  const LapTime = 10;
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([
+    { number: 1, time: 92.5 },
+    { number: 2, time: 90.2 },
+    { number: 3, time: 95.1 },
+  ]);
+  const lapAppended = useRef(false); 
 
   const handleLapNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -50,9 +61,39 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []); // Empty dependency array to run the effect only once on mount
 
+// Increments the timer
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTime(prev => parseFloat((prev + 0.1).toFixed(1)));
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Watch currentTime and append lap when threshold is crossed
+  useEffect(() => {
+    if (currentTime >= LapTime && !lapAppended.current) {
+      setLaps(prev => [...prev, { number: prev.length + 1, time: currentTime }]);
+      setCurrentTime(0); // reset timer
+      lapAppended.current = true; // mark as appended
+    }
+
+    if (currentTime < LapTime) {
+      lapAppended.current = false; // reset flag for next lap
+    }
+  }, [currentTime]);
+
+
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
+
+      <LapDisplay
+        currentLap={4}
+        currentTime={currentTime} // mock ticking or state variable
+        laps={laps} // Mocked laps data until its added
+      />
+
 
       <MapContainer
         center={initialPosition}
