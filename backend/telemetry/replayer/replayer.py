@@ -1,9 +1,21 @@
-import os, time, json, datetime as dt, decimal
+import os
+import time
+import json
+import datetime as dt
+import decimal
+import argparse
 from dotenv import load_dotenv
 from confluent_kafka import Producer
 from sqlalchemy import create_engine, text, bindparam  # add bindparam
 
 load_dotenv()
+
+# Command-line arguments
+parser = argparse.ArgumentParser(description="Stream telemetry data.")
+parser.add_argument(
+    "--skip-prompt", action="store_true", help="Skip the continue prompt and start streaming immediately."
+)
+args = parser.parse_args()
 
 EXCLUDE_VEHICLE_IDS = [
     int(s) for s in os.getenv("EXCLUDE_VEHICLE_IDS", "").replace(" ", "").split(",")
@@ -21,11 +33,13 @@ SPEED = float(os.getenv("SPEED_MULTIPLIER"))
 
 # Optional: if you set VEHICLE_ID, we'll filter to that one; otherwise ALL vehicles
 VEHICLE_ID_ENV = os.getenv("VEHICLE_ID")
-VEHICLE_ID     = int(VEHICLE_ID_ENV) if VEHICLE_ID_ENV not in (None, "", "None") else None
+VEHICLE_ID = int(VEHICLE_ID_ENV) if VEHICLE_ID_ENV not in (None, "", "None") else None
+
 
 def delivery_report(err, msg):
     if err:
         print(f"❌ Delivery failed: {err}")
+
 
 producer_conf = {
     "bootstrap.servers": BROKER,
@@ -35,6 +49,7 @@ producer_conf = {
     "acks": "1",
 }
 producer = Producer(producer_conf)
+
 
 def get_time_bounds():
     if not TRACK_NAME:
@@ -149,7 +164,9 @@ def main():
     # These are relative seconds
     print(f"First relative time: {tmin:.6f} s")
     print(f"Last  relative time: {tmax:.6f} s (duration)")
-    input("Continue? ")
+
+    if not args.skip_prompt:
+        input("Continue? ")
 
     start = dt.datetime.now(dt.timezone.utc)
 
