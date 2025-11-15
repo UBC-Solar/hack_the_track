@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
+import LapDisplay from './components/LapsDisplay';
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
@@ -13,6 +14,16 @@ export interface LatestPositions {
 
 export default function App() {
   const [latestPositions, setLatestPositions] = useState<LatestPositions>({}); // Store the latest position
+
+  // Mocked values for back end 
+  const LapTime = 10;
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([
+    { number: 1, time: 92.5 },
+    { number: 2, time: 90.2 },
+    { number: 3, time: 95.1 },
+  ]);
+  const lapAppended = useRef(false); 
 
   const fetchLatestPosition = async () => {
     try {
@@ -41,9 +52,38 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []); // Empty dependency array to run the effect only once on mount
 
+// Increments the timer (THIS WILL BE DELETED LATER !!!)
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setCurrentTime(prev => parseFloat((prev + 0.1).toFixed(1)));
+    }, 100);
+
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Watch currentTime and append lap when threshold is crossed
+  useEffect(() => {
+    if (currentTime >= LapTime && !lapAppended.current) {
+      setLaps(prev => [...prev, { number: prev.length + 1, time: currentTime }]);
+      setCurrentTime(0); // reset timer
+      lapAppended.current = true; // mark as appended
+    }
+
+    if (currentTime < LapTime) {
+      lapAppended.current = false; // reset flag for next lap
+    }
+  }, [currentTime]);
+
+
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
+
+      <LapDisplay
+        currentLap={4} // Locked for now, should come from backend
+        currentTime={currentTime} // Current time for the lap is being mocked
+        laps={laps} // Mocked laps data until its added
+      />
 
       <MapContainer
         center={initialPosition}
