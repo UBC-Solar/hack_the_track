@@ -1,18 +1,19 @@
-// src/App.tsx
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
-import FloatingForm from './components/FloatingForm';
 import TickConsumerToggle from './components/TickConsumerToggle';
+import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
+// Map car IDs to their most recent position
+export interface LatestPositions {
+  [index: number]: LatLngTuple;
+}
+
 export default function App() {
-  const [lapNumber, setLapNumber] = useState<number>(1);
-  const [samplePeriod, setSamplePeriod] = useState<number>(1);
-  const [error, setError] = useState<string | null>(null);
-  const [latestPosition, setLatestPosition] = useState<LatLngTuple | null>(null); // Store the latest position
+  const [latestPositions, setLatestPositions] = useState<LatestPositions>({}); // Store the latest position
 
   // Mocked values for back end 
   const LapTime = 10;
@@ -24,27 +25,17 @@ export default function App() {
   ]);
   const lapAppended = useRef(false); 
 
-  const handleLapNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const cleanedValue = value.replace(/^0+/, '') || '0';
-    setLapNumber(parseInt(cleanedValue, 10));
-  };
-
-  const handleSamplePeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSamplePeriod(Number(value));
-  };
-
   const fetchLatestPosition = async () => {
     try {
-      const response = await fetch('http://localhost:8000/latest/');
+      // Use /latestAll for actual data, or latestAllFake for mocked data
+      const response = await fetch('http://localhost:8000/latestAll/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
-      if (data.VBOX_Lat_Min === null || data.VBOX_Long_Minutes === null) throw new Error('Invalid position data');
-      setLatestPosition([data.VBOX_Lat_Min, data.VBOX_Long_Minutes]);
+      if (data == null) throw new Error('Invalid position data');
+      const positions: LatestPositions = data;
+      setLatestPositions(positions);
     } catch (error: any) {
       console.error('Error fetching latest position:', error);
-      setError(error.message);
     }
   };
 
@@ -52,7 +43,7 @@ export default function App() {
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
-    }, 100); // Poll period ms
+    }, 50); // Poll period
 
     // Fetch the first position right away
     fetchLatestPosition();
@@ -100,18 +91,15 @@ export default function App() {
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
       >
+        {/* Use Google Maps Satellite tiles */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online">Esri</a> contributors'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
-        {latestPosition && (
-          <CircleMarker
-            center={latestPosition}
-            radius={10}
-            fillColor="red"
-            color="white"
-            fillOpacity={0.8}
-          />
+
+        {/* Display only the newest position as a marker */}
+        {latestPositions && (
+          <VehicleMarkers positions={latestPositions}/>
         )}
       </MapContainer>
     </div>

@@ -49,25 +49,27 @@ const LapDisplay: React.FC<LapDisplayProps> = ({ currentLap, currentTime, laps }
             </div>
 
             {/* Previous Laps */}
-            <div style={{ ...boxStyle, maxHeight: '150px', overflowY: 'auto' }}>
+            <div style={{ ...boxStyle, maxHeight: '150px'}}>
                 <h4 style={headerStyle}>Previous Laps</h4>
-                {[...laps].reverse().map((lap, index, array) => {
-                    // Get the previous lap object. It will be undefined for the first lap.
-                    const prevLap = array[index + 1];
-                    
-                    // Check if a previous lap exists before comparing times
-                    const diff = prevLap ? lap.time - prevLap.time : 0; 
-                    
-                    const diffColor = diff === 0 ? '#ffee56ff' : diff < 0 ? '#4CAF50' : '#FF5252';
-                    return (
-                        <div key={lap.number} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                            <span style={textStyle}>Lap {lap.number}</span>
-                            <span style={{ ...timeStyle, color: diffColor }}>
-                                {lap.time.toFixed(1)}s {`(${diff > 0 ? '+' : ''}${diff.toFixed(1)})`}
-                            </span>
-                        </div>
-                    );
-                })}
+                <div style={{maxHeight: '130px', overflowY: 'auto'}}>
+                    {[...laps].reverse().map((lap, index, array) => {
+                        // Get the previous lap object. It will be undefined for the first lap.
+                        const prevLap = array[index + 1];
+                        
+                        // Check if a previous lap exists before comparing times
+                        const diff = prevLap ? lap.time - prevLap.time : 0; 
+                        
+                        const diffColor = diff === 0 ? '#ffee56ff' : diff < 0 ? '#4CAF50' : '#FF5252';
+                        return (
+                            <div key={lap.number} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                                <span style={textStyle}>Lap {lap.number}</span>
+                                <span style={{ ...timeStyle, color: diffColor }}>
+                                    {lap.time.toFixed(1)}s {`(${diff > 0 ? '+' : ''}${diff.toFixed(1)})`}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

@@ -1,10 +1,12 @@
 # backend/main.py
 from fastapi import FastAPI, HTTPException
-from sqlalchemy import create_engine, MetaData, Table, select, desc
+from sqlalchemy import create_engine, MetaData, Table, select, desc, text
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from confluent_kafka import Producer
+from math import cos, sin, radians, degrees, pi
+from datetime import datetime
 import json
 import os
 
@@ -53,6 +55,66 @@ def get_latest_row():
             return dict(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/latestAll")
+def get_latest_all():
+    try:
+        with engine.connect() as conn:
+
+            # Get a table with rows containing the most recent lat/lon for each distinct vehicle
+            sql_txt = f"""
+                SELECT DISTINCT ON (vehicle_id)
+                    ts,
+                    vehicle_id,
+                    "VBOX_Lat_Min",
+                    "VBOX_Long_Minutes"
+                FROM telem_tick
+                WHERE ts > now() - interval '1 second'
+                ORDER BY vehicle_id, ts DESC;
+            """
+            stmt = text(sql_txt)
+
+            result = conn.execute(stmt).mappings().fetchall()
+
+            if not result:
+                raise HTTPException(status_code=404, detail="No telemetry data found")
+
+            # Create a mapping from vehicle ids to most recent position
+
+            veh_locations: dict[int, tuple[float, float]] = {
+                veh_row['vehicle_id']: (veh_row['VBOX_Lat_Min'], veh_row['VBOX_Long_Minutes']) for veh_row in result
+            }
+
+            return veh_locations
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/latestAllFake")
+def get_latest_all_fake(num_cars: int = 12, radius_m: float = 100, period_s: float = 5, center_coords = None):
+    """Return a dictionary of fake car GPS data
+
+    Will return 12 evenly spaced cars driving at constant speed in a circle at the center of the track.
+    """
+    earth_circumference = 40075.017 * 1000  # m
+    radius_deg = radius_m / earth_circumference * 360
+    center_coords = center_coords if center_coords is not None else (33.5325017, -86.6215766)
+
+    positions: dict[int, tuple[float, float]] = {}
+
+    deg_per_car = 360 / num_cars
+    for car_i in range(num_cars):
+
+        car_relative_angle = radians(deg_per_car * car_i)
+        current_time = datetime.now().timestamp() # seconds
+        phase = (current_time % period_s) * (2 * pi / period_s)
+        car_angle = car_relative_angle + phase
+
+        delta_lon = sin(car_angle) * radius_deg
+        delta_lat = cos(car_angle) * radius_deg
+
+        positions[car_i] = (center_coords[0] + delta_lat, center_coords[1] + delta_lon)
+
+    return positions
 
 # -------- Kafka control plumbing --------
 BROKER = os.getenv("BROKER", "localhost:9092")
@@ -114,4 +176,4 @@ def toggle_tick_consumer(payload: TogglePayload):
 
 
 if __name__ == "__main__":
-    print(get_example_lap(4))
+    print(get_latest_all_fake())
