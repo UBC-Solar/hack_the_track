@@ -61,17 +61,14 @@ def get_latest_row():
 
             # Get a table with rows containing the most recent lat/lon for each distinct vehicle
             sql_txt = f"""
-                select * from (
-                    select
-                        ts,
-                        vehicle_id,
-                        "VBOX_Lat_Min",
-                        "VBOX_Long_Minutes",
-                        row_number() over(partition by vehicle_id order by ts desc) as rn
-                    from
-                        telem_tick
-                ) t
-                where t.rn = 1
+                SELECT DISTINCT ON (vehicle_id)
+                    ts,
+                    vehicle_id,
+                    "VBOX_Lat_Min",
+                    "VBOX_Long_Minutes"
+                FROM telem_tick
+                WHERE ts > now() - interval '1 second'
+                ORDER BY vehicle_id, ts DESC;
             """
             stmt = text(sql_txt)
 
