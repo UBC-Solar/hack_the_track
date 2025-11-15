@@ -47,6 +47,7 @@ export default function TickConsumerToggle({ backendUrl = 'http://localhost:8000
         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
         minWidth: 220,
         fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+        color: 'black'
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
