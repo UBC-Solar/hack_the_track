@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from confluent_kafka import Producer
-from math import cos, sin, radians, pi
+from math import cos, sin, radians, degrees, pi
 from datetime import datetime
 import json
 import os
@@ -40,9 +40,9 @@ PG_DSN = os.getenv("PG_DSN", "postgresql://telemetry:telemetry@localhost:5432/te
 TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
 
 # Create SQLAlchemy engine
-engine = create_engine(PG_DSN, future=True)
-metadata = MetaData()
-tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
+# engine = create_engine(PG_DSN, future=True)
+# metadata = MetaData()
+# tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 
 @app.get("/latest")
 def get_latest_row():
@@ -98,7 +98,6 @@ def get_latest_all_fake(num_cars: int = 12, radius_m: float = 100, period_s: flo
     earth_circumference = 40075.017 * 1000  # m
     radius_deg = radius_m / earth_circumference * 360
     center_coords = center_coords if center_coords is not None else (33.5325017, -86.6215766)
-    print(radius_deg, center_coords)
 
     positions: dict[int, tuple[float, float]] = {}
 
@@ -110,10 +109,10 @@ def get_latest_all_fake(num_cars: int = 12, radius_m: float = 100, period_s: flo
         phase = (current_time % period_s) * (2 * pi / period_s)
         car_angle = car_relative_angle + phase
 
-        delta_lon = sin(car_angle)
-        delta_lat = cos(car_angle)
+        delta_lon = sin(car_angle) * radius_deg
+        delta_lat = cos(car_angle) * radius_deg
 
-        positions[car_i] = (delta_lon, delta_lat)
+        positions[car_i] = (center_coords[0] + delta_lat, center_coords[1] + delta_lon)
 
     return positions
 

@@ -19,11 +19,11 @@ export interface LatestPositions {
 
 export default function App() {
   const [latestPositions, setLatestPositions] = useState<LatestPositions>({}); // Store the latest position
-  const [positionHistory, setPositionHistory] = useState<PositionWithTimestamp[]>([]); // Store position history
+  // const [positionHistory, setPositionHistory] = useState<PositionWithTimestamp[]>([]); // Store position history
 
   const fetchLatestPosition = async () => {
     try {
-      const response = await fetch('http://localhost:8000/latestAll/');
+      const response = await fetch('http://localhost:8000/latestAllFake/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
       if (data == null) throw new Error('Invalid position data');
