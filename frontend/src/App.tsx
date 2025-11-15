@@ -6,12 +6,6 @@ import VehicleMarkers from './components/VehicleMarkers';
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
-// Interface to store position and its timestamp
-interface PositionWithTimestamp {
-  position: LatLngTuple;
-  timestamp: number;
-}
-
 // Map car IDs to their most recent position
 export interface LatestPositions {
   [index: number]: LatLngTuple;
@@ -19,7 +13,6 @@ export interface LatestPositions {
 
 export default function App() {
   const [latestPositions, setLatestPositions] = useState<LatestPositions>({}); // Store the latest position
-  // const [positionHistory, setPositionHistory] = useState<PositionWithTimestamp[]>([]); // Store position history
 
   const fetchLatestPosition = async () => {
     try {
@@ -47,26 +40,6 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []); // Empty dependency array to run the effect only once on mount
 
-
-  // Update position history when new position is fetched
-  // useEffect(() => {
-  //   if (latestPositions) {
-  //     const timestamp = Date.now();
-  //     const newPosition: PositionWithTimestamp = {
-  //       position: latestPosition,
-  //       timestamp,
-  //     };
-
-  //     // Filter out positions older than 60 seconds
-  //     const updatedHistory = [
-  //       ...positionHistory.filter((p) => timestamp - p.timestamp <= 60000),
-  //       newPosition,
-  //     ];
-
-  //     setPositionHistory(updatedHistory);
-  //   }
-  // }, [latestPosition]);
-
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
@@ -82,16 +55,6 @@ export default function App() {
           attribution='&copy; <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online">Esri</a> contributors'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
-
-        {/* Polyline for the path (full trail of recent positions) */}
-        {/* {positionHistory.length > 0 && (
-          <Polyline
-            positions={positionHistory.map((p) => p.position)}
-            color="blue"
-            weight={2}
-            opacity={0.5}
-          />
-        )} */}
 
         {/* Display only the newest position as a marker */}
         {latestPositions && (
