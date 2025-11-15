@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from confluent_kafka import Producer
+from math import cos, sin, radians, pi
+from datetime import datetime
 import json
 import os
 
@@ -55,7 +57,7 @@ def get_latest_row():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/latestAll")
-def get_latest_row():
+def get_latest_all():
     try:
         with engine.connect() as conn:
 
@@ -86,6 +88,34 @@ def get_latest_row():
             return veh_locations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/latestAllFake")
+def get_latest_all_fake(num_cars: int = 12, radius_m: float = 100, period_s: float = 5, center_coords = None):
+    """Return a dictionary of fake car GPS data
+
+    Will return 12 evenly spaced cars driving at constant speed in a circle at the center of the track.
+    """
+    earth_circumference = 40075.017 * 1000  # m
+    radius_deg = radius_m / earth_circumference * 360
+    center_coords = center_coords if center_coords is not None else (33.5325017, -86.6215766)
+    print(radius_deg, center_coords)
+
+    positions: dict[int, tuple[float, float]] = {}
+
+    deg_per_car = 360 / num_cars
+    for car_i in range(num_cars):
+
+        car_relative_angle = radians(deg_per_car * car_i)
+        current_time = datetime.now().timestamp() # seconds
+        phase = (current_time % period_s) * (2 * pi / period_s)
+        car_angle = car_relative_angle + phase
+
+        delta_lon = sin(car_angle)
+        delta_lat = cos(car_angle)
+
+        positions[car_i] = (delta_lon, delta_lat)
+
+    return positions
 
 # -------- Kafka control plumbing --------
 BROKER = os.getenv("BROKER", "localhost:9092")
@@ -147,4 +177,4 @@ def toggle_tick_consumer(payload: TogglePayload):
 
 
 if __name__ == "__main__":
-    print(get_latest_row())
+    print(get_latest_all_fake())
