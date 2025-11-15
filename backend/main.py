@@ -40,9 +40,9 @@ PG_DSN = os.getenv("PG_DSN", "postgresql://telemetry:telemetry@localhost:5432/te
 TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
 
 # Create SQLAlchemy engine
-# engine = create_engine(PG_DSN, future=True)
-# metadata = MetaData()
-# tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
+engine = create_engine(PG_DSN, future=True)
+metadata = MetaData()
+tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 
 @app.get("/latest")
 def get_latest_row():

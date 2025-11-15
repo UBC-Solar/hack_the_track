@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker } from 'react-leaflet';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
@@ -16,7 +16,8 @@ export default function App() {
 
   const fetchLatestPosition = async () => {
     try {
-      const response = await fetch('http://localhost:8000/latestAllFake/');
+      // Use /latestAll for actual data, or latestAllFake for mocked data
+      const response = await fetch('http://localhost:8000/latestAll/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
       if (data == null) throw new Error('Invalid position data');
@@ -31,7 +32,7 @@ export default function App() {
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
-    }, 100); // Poll period
+    }, 50); // Poll period
 
     // Fetch the first position right away
     fetchLatestPosition();
