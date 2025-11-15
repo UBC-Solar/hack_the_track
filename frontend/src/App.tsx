@@ -89,11 +89,10 @@ export default function App() {
       <TickConsumerToggle backendUrl="http://localhost:8000" />
 
       <LapDisplay
-        currentLap={4}
-        currentTime={currentTime} // mock ticking or state variable
+        currentLap={4} // Locked for now, should come from backend
+        currentTime={currentTime} // Current time for the lap is being mocked
         laps={laps} // Mocked laps data until its added
       />
-
 
       <MapContainer
         center={initialPosition}

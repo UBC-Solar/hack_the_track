@@ -41,10 +41,11 @@ export default function TickConsumerToggle({ backendUrl = 'http://localhost:8000
         top: 12,
         right: 12,
         zIndex: 1000,
-        background: 'rgba(255,255,255,0.95)',
-        padding: '10px 12px',
-        borderRadius: 8,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        backgroundColor: '#333',
+        color: 'white',
+        padding: '15px',
+        borderRadius: '15px',
+        boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
         minWidth: 220,
         fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
       }}
@@ -67,7 +68,7 @@ export default function TickConsumerToggle({ backendUrl = 'http://localhost:8000
         </span>
       </div>
       {error && (
-        <div style={{ marginTop: 6, color: '#b00020', fontSize: 12 }}>
+        <div style={{ marginTop: 6, color: '#FF5252', fontSize: 12 }}>
           {error}
         </div>
       )}
