@@ -26,9 +26,9 @@ export default function App() {
       const response = await fetch('http://localhost:8000/latestAll/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
-      console.log(data)
-      if (data.VBOX_Lat_Min === null || data.VBOX_Long_Minutes === null) throw new Error('Invalid position data');
-      setLatestPositions(data);
+      if (data == null) throw new Error('Invalid position data');
+      const positions: LatestPositions = data;
+      setLatestPositions(positions);
     } catch (error: any) {
       console.error('Error fetching latest position:', error);
     }
@@ -77,9 +77,10 @@ export default function App() {
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
       >
+        {/* Use Google Maps Satellite tiles */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online">Esri</a> contributors'
+          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
 
         {/* Polyline for the path (full trail of recent positions) */}
