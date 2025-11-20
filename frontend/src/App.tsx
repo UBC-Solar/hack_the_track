@@ -4,6 +4,7 @@ import type { LatLngTuple } from 'leaflet';
 import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
+import VehicleSelector from './components/VehicleSelector';
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
@@ -85,9 +86,12 @@ export default function App() {
         laps={laps} // Mocked laps data until its added
       />
 
+      <VehicleSelector/>
+
       <MapContainer
         center={initialPosition}
         zoom={16}
+        zoomControl={false}
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
       >

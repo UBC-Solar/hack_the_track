@@ -72,32 +72,3 @@ class TelemetryDB:
             vehicle_code=r["vehicle_code"],
             db=self,
         )
-
-    # ------------------------------
-    # Vehicle mapping
-    # ------------------------------
-    def get_vehicle_code_by_id(self, vehicle_id: int) -> Optional[str]:
-        """Get the vehicle code for a given vehicle ID."""
-        q = text("""
-            SELECT code
-            FROM telem.vehicle
-            WHERE id = :vehicle_id
-        """)
-        with self.engine.begin() as conn:
-            r = conn.execute(q, {"vehicle_id": vehicle_id}).mappings().first()
-        if r:
-            return r["code"]
-        return None
-
-    def get_vehicle_id_by_code(self, vehicle_code: str) -> Optional[int]:
-        """Get the vehicle ID for a given vehicle code."""
-        q = text("""
-            SELECT id
-            FROM telem.vehicle
-            WHERE code = :vehicle_code
-        """)
-        with self.engine.begin() as conn:
-            r = conn.execute(q, {"vehicle_code": vehicle_code}).mappings().first()
-        if r:
-            return r["id"]
-        return None

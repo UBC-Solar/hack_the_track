@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from confluent_kafka import Producer
-from math import cos, sin, radians, degrees, pi
+from math import cos, sin, radians, pi
 from datetime import datetime
 import json
 import os

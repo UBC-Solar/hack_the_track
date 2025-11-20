@@ -78,8 +78,15 @@ button:focus-visible {
   z-index: 900;
 }
 
-/* Style for the lap boxes */
-.lap-box {
+.vehicle-selector {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 900;
+}
+
+/* Style for all ui boxes */
+.ui-box {
   background-color: #333;
   color: white;
   padding: 15px;
@@ -89,13 +96,13 @@ button:focus-visible {
 }
 
 /* Header style for the lap boxes */
-.lap-header {
+.ui-header {
   margin: 0 0 8px 0;
   color: #4CAF50;
 }
 
 /* Style for the lap text */
-.lap-text {
+.ui-text {
   margin: 0;
   font-size: 12px;
 }
