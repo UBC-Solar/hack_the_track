@@ -19,11 +19,7 @@ export default function App() {
   // Mocked values for back end 
   const LapTime = 10;
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([
-    { number: 1, time: 92.5 },
-    { number: 2, time: 90.2 },
-    { number: 3, time: 95.1 },
-  ]);
+  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
   const lapAppended = useRef(false); 
 
   const fetchLatestPosition = async () => {
@@ -40,10 +36,18 @@ export default function App() {
     }
   };
 
+  const fetchLatestLaps = async () => {
+    const response = await fetch('http://localhost:8000/currentLaps/');
+    
+    const data = await response.json();
+    setLaps(data);
+  }
+
   // Polling function for fetching latest GPS position
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
+      fetchLatestLaps();
     }, 50); // Poll period
 
     // Fetch the first position right away
@@ -65,7 +69,6 @@ export default function App() {
   // Watch currentTime and append lap when threshold is crossed
   useEffect(() => {
     if (currentTime >= LapTime && !lapAppended.current) {
-      setLaps(prev => [...prev, { number: prev.length + 1, time: currentTime }]);
       setCurrentTime(0); // reset timer
       lapAppended.current = true; // mark as appended
     }

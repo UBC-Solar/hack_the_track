@@ -44,6 +44,20 @@ engine = create_engine(PG_DSN, future=True)
 metadata = MetaData()
 tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 
+@app.get("/currentLaps")
+def get_current_laps(vehicle_ID : str):
+    try:
+        with engine.connect() as conn:
+            result = [{ "number": 1, "time": 92.5 },
+                    { "number": 2, "time": 90.2 },
+                    { "number": 3, "time": 95.1 },
+                    ]
+            if not result:
+                raise HTTPException(status_code=404, detail="No telemetry data found")
+            return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/latest")
 def get_latest_row():
     try:
