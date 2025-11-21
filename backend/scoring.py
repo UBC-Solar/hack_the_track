@@ -17,7 +17,7 @@ gates = [
 originalState = [StatePosition((i-5)/10, (i-5)/10, i/10) for i in range(50)]
 modifiedState1 = [StatePosition((i-5)/8, (i-5)/8, i/10) for i in range(50)]
 modifiedState2 = [StatePosition((i-5)/12, (i-5)/12, i/10) for i in range(50)]
-modifiedState3 = [StatePosition(-(i-5)/12, -(i-5)/12, i/10) for i in range(50)]
+modifiedState3 = [StatePosition((-i-5)/12, (-i-5)/12, i/10) for i in range(50)]
 
 # Efficient Intersection Algorithm, taken from https://bryceboe.com/2006/10/23/line-segment-intersection-algorithm/
 
@@ -42,7 +42,9 @@ def findIntersection(state: list[StatePosition], gates: list[list]):
     initialTime = state[0].time
 
     for index in range(len(state)):
-        if index != len(state):
+        if index < (len(state)-1):
+            print(len(state)-1)
+            print([state[index + 1].x, state[index + 1].x])
             point1 = [state[index].x, state[index].x]
             point2 = [state[index + 1].x, state[index + 1].x]
 
