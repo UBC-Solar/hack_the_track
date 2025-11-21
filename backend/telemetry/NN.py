@@ -1,50 +1,45 @@
-import pandas as pd
+import os
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torch.utils.data import Dataset
-from torchvision import datasets, transforms
-import matplotlib.pyplot as plt
-import numpy as np
+from torch import nn
+from torch.utils.data import TensorDataset, DataLoader
+#model class to declare RNN and defining a forward pass of the model
 
-from telemetry.raw.TelemetryDB import TelemetryDB
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
 
 
+class RNN(nn.Module):
 
-#custom dataset from telemetry data
-db = TelemetryDB("postgresql+psycopg2://racer:changeme@100.120.36.75:5432/racing")
+    def __init__(self, input_size, hidden_size, num_layers, seq_length, output_size):
+        #inherits from nn.Module
+        super(RNN, self).__init__()
+        self.hidden_size = hidden_size  #dim of memory inside lstm
+        self.num_layers = num_layers  #stacked lstm layers
+        #lstm: long short term memory - looks at lng term dependencies in sequential data
 
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)  #correspond to input data shape
+        self.seq_length = seq_length  #no of timestamps to look at to predict the next control output
 
-# Speed
-# nmot
-#figure out how weather data affects?
-#clean up data, do th egraphs to check for hte laps of all the cars, then try to remove those that might not be necessary. we then also look at making databases for the neural network. think about how th einputs/outputs map and how we are predicting the next state ?
-# ath
-# accx_can
-# accy_can
-# VBOX_Long_Minutes
-# VBOX_Lat_Min
-# Laptrigger_lapdist_dls
+        #num classes is the no of outputs predicted by the model
 
-
-from torch.utils.data import Dataset
+        #to convert memory vector to outputs (shaping constraints)
+        self.fc = nn.Linear(hidden_size, output_size)
 
 
-class telemetryDataset(Dataset):
-    def __init__(self, state, control):
-        self.state = state
-        self.control = control
+    def forward(self, x):
+        #inital hidden, cell states - these are internal memory vectors
+        #hidden = short term memory, current output of LSTM at a given time
+        hidden_state = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
+        #cell state = long term memory, stores trends (remmebers info over many time steps)
 
-    def __get__(self, index):
+        cell_states = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(device)
 
-
-    def __len__(self):
-        return len(self.features)
-
-    def __getitem__(self, idx):
-        return self.features[idx], self.targets[idx]
-
+        #forward propagate lstm
+        out, _ = self.lstm(x)
+        #out, _ = self.lstm(x, (hidden_state,
+        #                        cell_states))  #out; tensor of shape(batch_soze, seq_length, hidden_size) - at the final time step
+        #decode the hidden state of t
+        out = self.fc(out[:, -1, :])
+        return out
 
 
