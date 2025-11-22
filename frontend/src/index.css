@@ -66,3 +66,75 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Container for the Lap Display */
+.lap-display {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  z-index: 900;
+}
+
+.vehicle-selector {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 900;
+}
+
+/* Style for all ui boxes */
+.ui-box {
+  background-color: #333;
+  color: white;
+  padding: 15px;
+  border-radius: 15px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  width: 250px;
+}
+
+/* Header style for the lap boxes */
+.ui-header {
+  margin: 0 0 8px 0;
+  color: #4CAF50;
+}
+
+/* Style for the lap text */
+.ui-text {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Style for the lap time */
+.lap-time {
+  font-size: 12px;
+  font-weight: bold;
+  text-align: right;
+}
+
+/* Specific style for the scrollable Previous Laps container */
+.previous-laps {
+  max-height: 150px;
+}
+
+/* Scrollable container for previous laps */
+.lap-scroll {
+  max-height: 130px;
+  overflow-y: auto;
+}
+
+/* Style for individual lap items in the Previous Laps section */
+.lap-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+/* Style for current and best lap items */
+.lap-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}

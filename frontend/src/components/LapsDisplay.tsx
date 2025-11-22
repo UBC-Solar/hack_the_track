@@ -19,51 +19,41 @@ const LapDisplay: React.FC<LapDisplayProps> = ({ currentLap, currentTime, laps }
     const bestLapNum = bestLapObj?.number ?? null;
 
     return (
-        <div
-            style={{
-                position: 'absolute',
-                bottom: '20px',
-                right: '20px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '15px',
-                zIndex: 900,
-            }}
-        >
+        <div className="lap-display">
             {/* Current Lap */}
-            <div style={boxStyle}>
-                <h4 style={headerStyle}>Current Lap</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={textStyle}>Lap {currentLap}</span>
-                    <span style={timeStyle}>{currentTime.toFixed(1)}s</span>
+            <div className="ui-box">
+                <h4 className="ui-header">Current Lap</h4>
+                <div className="lap-info">
+                    <span className="ui-text">Lap {currentLap}</span>
+                    <span className="lap-time">{currentTime.toFixed(1)}s</span>
                 </div>
             </div>
 
             {/* Best Lap */}
-            <div style={boxStyle}>
-                <h4 style={headerStyle}>Best Lap</h4>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={textStyle}>Lap {bestLapNum ?? '—'}</span>
-                    <span style={timeStyle}>{bestLapTime.toFixed(1)}s</span>
+            <div className="ui-box">
+                <h4 className="ui-header">Best Lap</h4>
+                <div className="lap-info">
+                    <span className="ui-text">Lap {bestLapNum ?? '—'}</span>
+                    <span className="lap-time">{bestLapTime.toFixed(1)}s</span>
                 </div>
             </div>
 
             {/* Previous Laps */}
-            <div style={{ ...boxStyle, maxHeight: '150px'}}>
-                <h4 style={headerStyle}>Previous Laps</h4>
-                <div style={{maxHeight: '130px', overflowY: 'auto'}}>
+            <div className="ui-box previous-laps">
+                <h4 className="ui-header">Previous Laps</h4>
+                <div className="lap-scroll">
                     {[...laps].reverse().map((lap, index, array) => {
                         // Get the previous lap object. It will be undefined for the first lap.
                         const prevLap = array[index + 1];
-                        
+
                         // Check if a previous lap exists before comparing times
                         const diff = prevLap ? lap.time - prevLap.time : 0; 
-                        
+
                         const diffColor = diff === 0 ? '#ffee56ff' : diff < 0 ? '#4CAF50' : '#FF5252';
                         return (
-                            <div key={lap.number} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                <span style={textStyle}>Lap {lap.number}</span>
-                                <span style={{ ...timeStyle, color: diffColor }}>
+                            <div key={lap.number} className="lap-item">
+                                <span className="ui-text">Lap {lap.number}</span>
+                                <span className="lap-time" style={{ color: diffColor }}>
                                     {lap.time.toFixed(1)}s {`(${diff > 0 ? '+' : ''}${diff.toFixed(1)})`}
                                 </span>
                             </div>
@@ -73,30 +63,6 @@ const LapDisplay: React.FC<LapDisplayProps> = ({ currentLap, currentTime, laps }
             </div>
         </div>
     );
-};
-
-const boxStyle: React.CSSProperties = {
-    backgroundColor: '#333',
-    color: 'white',
-    padding: '15px',
-    borderRadius: '15px',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-    width: '250px',
-};
-
-const headerStyle: React.CSSProperties = {
-    margin: '0 0 8px 0',
-    color: '#4CAF50',
-};
-
-const textStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: '12px',
-};
-
-const timeStyle: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 'bold',
 };
 
 export default LapDisplay;
