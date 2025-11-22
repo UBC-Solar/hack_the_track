@@ -96,19 +96,67 @@ def get_example_lap(lapNumber: int, samplePeriod: int = 1):
 # Routes: Telemetry Queries
 # -------------------------------------------------------------
 @app.get("/currentLaps")
-def get_current_laps(vehicle_ID: str):
+def get_current_laps(vehicleID: str):
     """
-    Placeholder for returning lap information for a vehicle.
-    Replace when real lap logic is implemented.
+    Get lap times for a specified vehicle, excluding the current lap.
     """
     try:
-        # Mocked data
-        result = [
-            {"number": 1, "time": 92.5},
-            {"number": 2, "time": 90.2},
-            {"number": 3, "time": 95.1},
-        ]
-        return result
+        with engine.connect() as conn:
+            # First, we query to get the current lap (the one with the most recent timestamp)
+            current_lap_stmt = text("""
+                SELECT lap
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            # Execute the query to get the current lap number
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            # If no laps are found for the vehicle, raise an error
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            current_lap = current_lap_result["lap"]
+
+            # Query to get the first and last timestamps for each lap, excluding the current lap
+            stmt = text("""
+                SELECT
+                    lap,
+                    MIN(ts) AS first_timestamp,
+                    MAX(ts) AS last_timestamp
+                FROM
+                    telem_tick
+                WHERE
+                    vehicle_id = :vehicle_id
+                    AND lap != :current_lap  -- Exclude the current lap
+                GROUP BY
+                    lap
+                ORDER BY
+                    lap;
+            """)
+
+            # Execute the query and fetch the results
+            result = conn.execute(stmt, {"vehicle_id": vehicleID, "current_lap": current_lap}).mappings().fetchall()
+
+            # If no laps are found (after excluding current lap), raise an error
+            if not result:
+                raise HTTPException(status_code=404, detail="No lap data found for this vehicle.")
+
+            # Calculate lap times (difference between first and last timestamp)
+            lap_times = []
+            for row in result:
+                lap_number = row["lap"]
+                first_timestamp = row["first_timestamp"]
+                last_timestamp = row["last_timestamp"]
+                if first_timestamp and last_timestamp:
+                    # Calculate the time difference in seconds
+                    lap_time = (last_timestamp - first_timestamp).total_seconds()
+                    lap_times.append({"number": lap_number, "time": lap_time})
+
+            return lap_times
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

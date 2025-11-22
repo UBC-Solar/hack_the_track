@@ -104,22 +104,25 @@ export default function App() {
   // ================ POLLING LOOPS ================
 
   // Poll latest position of all cars
-  const positionPollMs = 50;
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-
-      fetchLatestPosition();
-      fetchVehicles();
-      selectedVehicleID && fetchLatestLaps();
-
-    }, positionPollMs);
-
-    // Fetch the first position right away
+const positionPollMs = 50;
+useEffect(() => {
+  const intervalId = setInterval(() => {
     fetchLatestPosition();
+    fetchVehicles();
 
-    // Cleanup polling on component unmount
-    return () => clearInterval(intervalId);
-  }, []); // Empty dependency array to run the effect only once on mount
+    // Only fetch latest laps if selectedVehicleID is not null
+    if (selectedVehicleID !== null) {
+      fetchLatestLaps();
+    }
+
+  }, positionPollMs);
+
+  // Fetch the first position right away
+  fetchLatestPosition();
+
+  // Cleanup polling on component unmount
+  return () => clearInterval(intervalId);
+}, [selectedVehicleID]); // Add selectedVehicleID as a dependency
 
   // Watch currentTime and append lap when threshold is crossed
   useEffect(() => {
