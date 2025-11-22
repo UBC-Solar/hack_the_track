@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import json
 import os
 from math import cos, sin, radians, pi
+from random import random
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -310,7 +311,7 @@ def get_latest_all():
 
 
 # -------------------------------------------------------------
-# Routes: Fake Telemetry Generator
+# Dummy Functions
 # -------------------------------------------------------------
 @app.get("/latestAllFake")
 def get_latest_all_fake(
@@ -346,7 +347,25 @@ def get_latest_all_fake(
 
     return results
 
+@app.get("/driverInsightFake")
+def get_latest_all_fake(
+    vehicleID: int,
+):
+    """
+    Returns fake driver insights for testing
+    """
 
+    lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+    lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+
+    rand = random()
+
+    if rand < 0.25: insight = "➡️ Steer Right +10%" 
+    elif rand < 0.5: insight = "⬅️ Steer Left +10%" 
+    elif rand < 0.75: insight = "⏩ Increase Acceleration +10%" 
+    else: insight = "⏪ Decrease Acceleration +10%" 
+
+    return {"startLat": lat, "startLon": lon, "driverInsight": insight}
 
 
 # -------------------------------------------------------------
@@ -414,4 +433,4 @@ def toggle_tick_consumer(payload: TogglePayload):
 # Debug Execution
 # -------------------------------------------------------------
 if __name__ == "__main__":
-    print(get_latest_all_fake())
+    print(get_current_laps(36))
