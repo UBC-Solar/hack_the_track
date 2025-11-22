@@ -178,7 +178,7 @@ export default function App() {
   // ================ POLLING LOOPS ================
 
   // Poll latest position of all cars
-  const positionPollMs = 200;
+  const positionPollMs = 500;
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
