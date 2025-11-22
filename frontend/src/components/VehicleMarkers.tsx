@@ -4,7 +4,7 @@ import { CircleMarker, Tooltip } from 'react-leaflet';
 interface VehicleMarkersProps {
   positions: LatestPositions;
   showOption: 'primary' | 'all';
-  selectedVehicleID: number;
+  selectedVehicleID: number | null;
 }
 
 // Generate a consistent color from the vehicle ID
