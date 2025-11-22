@@ -83,6 +83,7 @@ button:focus-visible {
   top: 20px;
   right: 20px;
   z-index: 900;
+  font-weight: 600;
 }
 
 /* Style for all ui boxes */
