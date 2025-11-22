@@ -8,10 +8,12 @@ dependencies = [
     "confluent-kafka>=2.12.2",
     "dotenv>=0.9.9",
     "fastapi>=0.121.0",
+    "joblib>=1.5.2",
     "matplotlib>=3.10.7",
     "pandas>=2.3.3",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.3",
     "sqlalchemy>=2.0.44",
+    "torch>=2.9.1",
     "uvicorn>=0.38.0",
 ]
