@@ -81,8 +81,9 @@ button:focus-visible {
 .vehicle-selector {
   position: absolute;
   top: 20px;
-  left: 20px;
+  right: 20px;
   z-index: 900;
+  font-weight: 600;
 }
 
 /* Style for all ui boxes */

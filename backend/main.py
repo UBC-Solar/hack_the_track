@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 import json
 import os
 from math import cos, sin, radians, pi
+from random import random
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -96,22 +97,147 @@ def get_example_lap(lapNumber: int, samplePeriod: int = 1):
 # Routes: Telemetry Queries
 # -------------------------------------------------------------
 @app.get("/currentLaps")
-def get_current_laps(vehicle_ID: str):
+def get_current_laps(vehicleID: str):
     """
-    Placeholder for returning lap information for a vehicle.
-    Replace when real lap logic is implemented.
+    Get lap times for a specified vehicle, excluding the current lap.
     """
     try:
-        # Mocked data
-        result = [
-            {"number": 1, "time": 92.5},
-            {"number": 2, "time": 90.2},
-            {"number": 3, "time": 95.1},
-        ]
-        return result
+        with engine.connect() as conn:
+            # First, we query to get the current lap (the one with the most recent timestamp)
+            current_lap_stmt = text("""
+                SELECT lap
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            # Execute the query to get the current lap number
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            # If no laps are found for the vehicle, raise an error
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            current_lap = current_lap_result["lap"]
+
+            # Query to get the first and last timestamps for each lap, excluding the current lap
+            stmt = text("""
+                SELECT
+                    lap,
+                    MIN(ts) AS first_timestamp,
+                    MAX(ts) AS last_timestamp
+                FROM
+                    telem_tick
+                WHERE
+                    vehicle_id = :vehicle_id
+                    AND lap != :current_lap  -- Exclude the current lap
+                GROUP BY
+                    lap
+                ORDER BY
+                    lap;
+            """)
+
+            # Execute the query and fetch the results
+            result = conn.execute(stmt, {"vehicle_id": vehicleID, "current_lap": current_lap}).mappings().fetchall()
+
+            # If no laps are found (after excluding current lap), raise an error
+            if not result:
+                raise HTTPException(status_code=404, detail="No lap data found for this vehicle.")
+
+            # Calculate lap times (difference between first and last timestamp)
+            lap_times = []
+            for row in result:
+                lap_number = row["lap"]
+                first_timestamp = row["first_timestamp"]
+                last_timestamp = row["last_timestamp"]
+                if first_timestamp and last_timestamp:
+                    # Calculate the time difference in seconds
+                    lap_time = (last_timestamp - first_timestamp).total_seconds()
+                    lap_times.append({"number": lap_number, "time": lap_time})
+
+            return lap_times
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/currentLap")
+def get_current_lap(vehicleID: str):
+    """
+    Returns the current lap for the selected vehicle.
+    This is determined by the most recent telemetry data for that vehicle.
+    """
+    try:
+        with engine.connect() as conn:
+            # Query to get the most recent telemetry data for the given vehicle
+            current_lap_stmt = text("""
+                SELECT lap
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            # Execute the query to get the current lap number
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            # Return the current lap number
+            return {"currentLap": current_lap_result["lap"]}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/currentLapTime")
+def get_current_lap_time(vehicleID: str):
+    """
+    Returns the current lap time for the selected vehicle.
+    This is calculated by finding the difference between the current time and the first timestamp
+    of the vehicle's current lap.
+    """
+    try:
+        with engine.connect() as conn:
+            # Query to get the current lap number and time (based on most recent telemetry)
+            current_lap_stmt = text("""
+                SELECT lap, ts
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            current_lap = current_lap_result["lap"]
+            current_ts = current_lap_result["ts"]
+
+            # Query to get the first timestamp for the current lap
+            first_timestamp_stmt = text("""
+                SELECT MIN(ts) AS first_timestamp
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                AND lap = :current_lap;
+            """)
+
+            first_timestamp_result = conn.execute(first_timestamp_stmt, {"vehicle_id": vehicleID, "current_lap": current_lap}).mappings().fetchone()
+
+            if not first_timestamp_result or not first_timestamp_result["first_timestamp"]:
+                raise HTTPException(status_code=404, detail="No telemetry data found for the current lap.")
+
+            first_timestamp = first_timestamp_result["first_timestamp"]
+
+            # Calculate the difference between current time and first timestamp of the lap
+            lap_time_seconds = (current_ts - first_timestamp).total_seconds()
+
+            return {"currentLapTime": lap_time_seconds}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/vehicles")
 def list_all_vehicles():
@@ -185,7 +311,7 @@ def get_latest_all():
 
 
 # -------------------------------------------------------------
-# Routes: Fake Telemetry Generator
+# Dummy Functions
 # -------------------------------------------------------------
 @app.get("/latestAllFake")
 def get_latest_all_fake(
@@ -220,6 +346,31 @@ def get_latest_all_fake(
         results[i] = (center_coords[0] + d_lat, center_coords[1] + d_lon)
 
     return results
+
+@app.get("/driverInsightFake")
+def get_insight_fake(
+    vehicleID: int,
+):
+    """
+    Returns fake driver insights for testing
+    """
+
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+
+    rand = random()
+
+    if rand < 0.25: insight = "➡️ Steer Right +10%" 
+    elif rand < 0.5: insight = "⬅️ Steer Left +10%" 
+    elif rand < 0.75: insight = "⏩ Increase Acceleration +10%" 
+    else: insight = "⏪ Decrease Acceleration +10%" 
+
+    return {"startLat": lat, "startLon": lon, "driverInsight": insight}
 
 
 # -------------------------------------------------------------
@@ -287,4 +438,4 @@ def toggle_tick_consumer(payload: TogglePayload):
 # Debug Execution
 # -------------------------------------------------------------
 if __name__ == "__main__":
-    print(get_latest_all_fake())
+    print(get_current_laps(36))

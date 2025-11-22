@@ -30,13 +30,13 @@ const LapDisplay: React.FC<LapDisplayProps> = ({ currentLap, currentTime, laps }
             </div>
 
             {/* Best Lap */}
-            <div className="ui-box">
+            {/* <div className="ui-box">
                 <h4 className="ui-header">Best Lap</h4>
                 <div className="lap-info">
                     <span className="ui-text">Lap {bestLapNum ?? '—'}</span>
                     <span className="lap-time">{bestLapTime.toFixed(1)}s</span>
                 </div>
-            </div>
+            </div> */}
 
             {/* Previous Laps */}
             <div className="ui-box previous-laps">
