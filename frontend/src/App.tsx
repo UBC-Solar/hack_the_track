@@ -24,10 +24,9 @@ export default function App() {
   const [latestPositions, setLatestPositions] = useState<LatestPositions>({});
 
   // Laps numbers and times
-  const LapTime = 10;
+  const [currentLap, setCurrentLap] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
-  const lapAppended = useRef(false);
 
   // Vehicle selection
   const [vehicles, setVehicles] = useState<Array<number>>([]);
@@ -79,6 +78,47 @@ export default function App() {
     }
   };
 
+  const fetchCurrentLap = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/currentLap?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      setCurrentLap(data["currentLap"]);
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+    }
+  };
+
+    const fetchCurrentTime = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/currentLapTime?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Validate array shape
+      setCurrentTime(data["currentLapTime"]);
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+    }
+  };
+
   const fetchVehicles = async () => {
     try {
       const response = await fetch('http://localhost:8000/vehicles'); // Your endpoint
@@ -104,47 +144,27 @@ export default function App() {
   // ================ POLLING LOOPS ================
 
   // Poll latest position of all cars
-const positionPollMs = 50;
-useEffect(() => {
-  const intervalId = setInterval(() => {
-    fetchLatestPosition();
-    fetchVehicles();
-
-    // Only fetch latest laps if selectedVehicleID is not null
-    if (selectedVehicleID !== null) {
-      fetchLatestLaps();
-    }
-
-  }, positionPollMs);
-
-  // Fetch the first position right away
-  fetchLatestPosition();
-
-  // Cleanup polling on component unmount
-  return () => clearInterval(intervalId);
-}, [selectedVehicleID]); // Add selectedVehicleID as a dependency
-
-  // Watch currentTime and append lap when threshold is crossed
-  useEffect(() => {
-    if (currentTime >= LapTime && !lapAppended.current) {
-      setCurrentTime(0); // reset timer
-      lapAppended.current = true; // mark as appended
-    }
-
-    if (currentTime < LapTime) {
-      lapAppended.current = false; // reset flag for next lap
-    }
-  }, [currentTime]);
-
-  // Increments the timer (THIS WILL BE DELETED LATER !!!)
+  const positionPollMs = 50;
   useEffect(() => {
     const intervalId = setInterval(() => {
-      setCurrentTime(prev => parseFloat((prev + 0.1).toFixed(1)));
-    }, 100);
+      fetchLatestPosition();
+      fetchVehicles();
 
+      // Only fetch latest laps if selectedVehicleID is not null
+      if (selectedVehicleID !== null) {
+        fetchLatestLaps();
+        fetchCurrentLap();
+        fetchCurrentTime();
+      }
+
+    }, positionPollMs);
+
+    // Fetch the first position right away
+    fetchLatestPosition();
+
+    // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, []);
-
+  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
 
   // ================ RETURN ================
 
@@ -154,7 +174,7 @@ useEffect(() => {
 
       {selectedVehicleID && (
         <LapDisplay
-          currentLap={4} // Locked for now, should come from backend
+          currentLap={currentLap} // Locked for now, should come from backend
           currentTime={currentTime} // Current time for the lap is being mocked
           laps={laps} // Mocked laps data until its added
         />
