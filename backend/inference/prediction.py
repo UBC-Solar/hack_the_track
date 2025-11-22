@@ -55,29 +55,46 @@ class PathPredictor:
         """
         Tickdb is at 10 Hz (100 ms). Model was trained at 20 Hz (50 ms).
         Upsample the tick data to 50 ms using time-based interpolation.
-        Assumes the DataFrame index is a DatetimeIndex named 'ts' or similar.
+
+        Assumes df_tick has either:
+          - a DatetimeIndex already, or
+          - a 'ts' column that can be converted to datetime.
         """
-        # ensure datetime index
-        if not isinstance(df_tick.index, pd.DatetimeIndex):
-            if "ts" in df_tick.columns:
-                df_tick = df_tick.set_index("ts")
+        df = df_tick.copy()
+
+        # --- 1. Ensure DatetimeIndex ---
+        if not isinstance(df.index, pd.DatetimeIndex):
+            if "ts" in df.columns:
+                df["ts"] = pd.to_datetime(df["ts"])
+                df = df.set_index("ts")
             else:
-                raise ValueError("Need a datetime index or 'ts' column to resample.")
+                raise ValueError("Need a DatetimeIndex or a 'ts' column to resample.")
 
-        df_tick = df_tick.sort_index()
+        df = df.sort_index()
 
-        # Build a 50 ms index spanning the original window
-        start = df_tick.index[0]
-        end = df_tick.index[-1]
-        idx_50ms = pd.date_range(start=start, end=end, freq=TRAIN_DT)
+        # --- 2. Separate numeric and non-numeric columns ---
+        numeric_cols = df.select_dtypes(include="number").columns
+        non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
 
-        # Reindex + interpolate numerics in time
-        df_50 = df_tick.reindex(idx_50ms).interpolate(method="time")
-        # (optional) forward/back fill any remaining NaNs
-        df_50 = df_50.ffill().bfill()
+        df_num = df[numeric_cols]
 
-        df_50.index.name = df_tick.index.name
-        return df_50
+        # --- 3. Resample numeric columns to 50 ms and interpolate in time ---
+        df_num_resampled = (
+            df_num
+            .resample(TRAIN_DT)
+            .interpolate(method="time")
+        )
+
+        # --- 4. Bring back non-numeric columns with forward-fill ---
+        df_resampled = df_num_resampled.copy()
+        for c in non_numeric_cols:
+            df_resampled[c] = (
+                df[c]
+                .resample(TRAIN_DT)
+                .ffill()
+            )
+
+        return df_resampled
 
     @staticmethod
     def _rename_columns(car_df):
@@ -113,7 +130,8 @@ class PathPredictor:
         """
         cols_to_scale = state_cols + control_cols
 
-        df_raw = df_xy.reset_index(drop=True).copy()
+        # df_raw = df_xy.reset_index(drop=True).copy()
+        df_raw = df_xy.copy()
         df_scaled = df_raw.copy()
         df_scaled[cols_to_scale] = scaler.transform(df_raw[cols_to_scale])
 
@@ -237,8 +255,8 @@ class PathPredictor:
         return PathPredictor.xy_to_latlon(x, y, origin)
 
     def predict(self, car_df, num_indices=None):
-        car_df_20hz = PathPredictor.resample_to_training_rate(car_df)
-        car_df_renamed = self._rename_columns(car_df_20hz)
+        # car_df_20hz = PathPredictor.resample_to_training_rate(car_df)
+        car_df_renamed = self._rename_columns(car_df)
 
         car_df_xy, origin_rad = PathPredictor.inject_xy(car_df_renamed)
 
@@ -252,6 +270,11 @@ class PathPredictor:
             STATE_COLS, CONTROL_COLS,
             scale=SCALE, start_idx=0, horizon=num_indices, device=self._device
         )
+
+        print("STATE_COLS =", STATE_COLS)
+        print("predicted_path.shape =", predicted_path.shape)
+        print("first few unscaled states:")
+        print(predicted_path[:5])
 
         predicted_latitude, predicted_longitude = PathPredictor.get_lat_lon(predicted_path, origin_rad)
         true_latitude, true_longitude = PathPredictor.get_lat_lon(true_path, origin_rad)

@@ -67,7 +67,7 @@ services:
       GROUP_ID: tick-snapshots
       PG_DSN: postgresql://telemetry:telemetry@tickdb:5432/telemetry
       TICK_TABLE: telem_tick
-      TICK_SECS: "0.1"
+      TICK_SECS: "0.05"
       WIPE_ON_START: "true"          # do it at consumer startup
       WIPE_TABLES: "telem_tick"      # comma-separated if >1
       CONTROL_TOPIC: tick.control

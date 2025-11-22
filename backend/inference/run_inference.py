@@ -72,8 +72,9 @@ def load_tick_window(
 
 vehicle_id = 36
 
-df_window = load_tick_window(engine, vehicle_id, duration_s=20.0)
+df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=20.0)
 print(df_window.head())
+print(len(df_window))
 
 # pred_states is a NumPy array with columns in STATE_COLS order
 
@@ -82,8 +83,7 @@ lon_true = df_window["VBOX_Long_Minutes"].to_numpy()
 
 # 2. Predicted GPS from PathPredictor
 predictor = PathPredictor()
-# (lat_pred, lon_pred), (lat_true, lon_true) = predictor.predict(df_window)  # (lat, lon)
-(lat_pred, lon_pred), (_, _) = predictor.predict(df_window)  # (lat, lon)
+(lat_pred, lon_pred), (lat_true, lon_true) = predictor.predict(df_window)  # (lat, lon)
 
 # 3. Align lengths if needed
 n = min(len(lat_true), len(lat_pred))

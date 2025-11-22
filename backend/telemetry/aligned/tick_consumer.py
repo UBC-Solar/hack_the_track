@@ -11,7 +11,7 @@ TOPIC = os.getenv("TOPIC", "telem.stream_fast.raw")
 GROUP_ID = os.getenv("GROUP_ID", "tick-snapshots")
 PG_DSN = os.getenv("PG_DSN", "postgresql://telemetry:telemetry@tickdb:5434/telemetry")
 TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
-TICK_SECS = float(os.getenv("TICK_SECS", "0.1"))
+TICK_SECS = float(os.getenv("TICK_SECS", "0.05"))
 NAMES_ALLOWLIST = {s.strip() for s in os.getenv("NAMES_ALLOWLIST", "").split(",") if s.strip()}
 
 CONTROL_TOPIC = os.getenv("CONTROL_TOPIC", "tick.control")

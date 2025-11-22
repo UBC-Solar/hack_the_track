@@ -13,6 +13,7 @@ dependencies = [
     "pandas>=2.3.3",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.3",
+    "scikit-learn>=1.7.2",
     "sqlalchemy>=2.0.44",
     "torch>=2.9.1",
     "uvicorn>=0.38.0",
