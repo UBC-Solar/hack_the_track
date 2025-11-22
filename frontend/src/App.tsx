@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';import { divIcon } from 'leaflet';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
