@@ -348,15 +348,20 @@ def get_latest_all_fake(
     return results
 
 @app.get("/driverInsightFake")
-def get_latest_all_fake(
+def get_insight_fake(
     vehicleID: int,
 ):
     """
     Returns fake driver insights for testing
     """
 
-    lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
-    lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
 
     rand = random()
 

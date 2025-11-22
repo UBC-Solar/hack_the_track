@@ -202,7 +202,7 @@ export default function App() {
 
 
   // Poll backend for driver insights
-  const insightPollMs = 5000;
+  const insightPollMs = 10000;
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (selectedVehicleID !== null) {
@@ -258,7 +258,7 @@ export default function App() {
         {/* Modern styled marker for the latest driver insight */}
         {latestInsight && selectedVehicleID && (
           <CircleMarker
-            center={latestPositions[selectedVehicleID]}
+            center={latestInsight.startPosition}
             radius={0} // Size of the circle
             weight={0} // Border width
           >
