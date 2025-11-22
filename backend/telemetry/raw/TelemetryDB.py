@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Optional, List
 from sqlalchemy import create_engine, text
 import pandas as pd
-from telemetry.raw import VehicleRaceRecord
+from backend.telemetry.raw.VehicleRaceRecord import VehicleRaceRecord
 
 
 class TelemetryDB:
@@ -72,3 +72,49 @@ class TelemetryDB:
             vehicle_code=r["vehicle_code"],
             db=self,
         )
+
+    def load_tick_window(
+            self,
+            race: VehicleRaceRecord,
+            duration_s: float = 5.0,
+    ) -> pd.DataFrame:
+        """
+        Load ~duration_s seconds of fast-stream telemetry for one event/vehicle.
+        """
+        end_time = pd.Timestamp.utcnow()
+        start_time = end_time - pd.Timedelta(seconds=duration_s)
+
+        query = text("""
+                     SELECT sample_time AS timestamp,
+                   accx        AS accx_can,
+                   accy        AS accy_can,
+                   speed,
+                   gear,
+                   aps,
+                   nmot,
+                   pbrake_f,
+                   pbrake_r,
+                   vbox_lat AS VBOX_Lat_Min,
+                   vbox_lon AS VBOX_Long_Minutes
+                     FROM telem.stream_fast
+                     WHERE event_id = :event_id
+                       AND vehicle_id = :vehicle_id
+                       AND sample_time >= :start_time
+                       AND sample_time
+                         < :end_time
+                     ORDER BY sample_time
+                     """)
+
+        df = pd.read_sql(
+            query,
+            self.engine,
+            params={
+                "event_id": race.event_id,
+                "vehicle_id": race.vehicle_id,
+                "start_time": start_time,
+                "end_time": end_time,
+            }
+        )
+
+        df = df.sort_values("timestamp").set_index("timestamp")
+        return df

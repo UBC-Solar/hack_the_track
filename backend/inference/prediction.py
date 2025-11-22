@@ -1,5 +1,6 @@
-from inference.constants import STATE_COLS, CONTROL_COLS, EARTH_RADIUS, SEQ_LEN, SCALE
-from inference.models import RNN, MODEL_PATH, CarSequenceDataset
+from backend.inference.models import RNN, MODEL_PATH, CarSequenceDataset
+from backend.inference.constants import STATE_COLS, CONTROL_COLS, EARTH_RADIUS, SEQ_LEN, SCALE
+
 import numpy as np
 import joblib
 import torch

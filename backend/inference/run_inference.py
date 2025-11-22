@@ -6,7 +6,13 @@ import datetime as dt
 import pandas as pd
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
-from inference.prediction import PathPredictor
+from backend.inference.prediction import PathPredictor
+import pandas as pd
+import numpy as np
+from os import rename
+from sqlalchemy.testing.util import total_size
+
+
 
 
 # 1. Connect to tickdb
