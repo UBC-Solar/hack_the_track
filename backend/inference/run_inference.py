@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from inference.prediction import prepare_tickdb_dataframe_for_model, CarTrajectoryPredictor
 from inference.models import MODEL_PATH
 from inference.constants import state, control
+from inference.evaluation import trajectory_to_state_positions, scoreState, gates
+from inference.evaluation.scoring import testIntersection
 
 
 # 1. Connect to tickdb
@@ -71,7 +73,7 @@ def load_tick_window(
 
 vehicle_id = 36
 
-df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=20.0)
+df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=5.0)
 df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
 
 # Utility: run prediction and return (lat_pred, lon_pred)
@@ -131,6 +133,47 @@ for name, df_mod in df_variants.items():
 
 lat_true, lon_true, _, _ = predictor.predict(df_model)
 
+baseline_lat, baseline_lon = pred_results["baseline"]
+baseline_state = trajectory_to_state_positions(
+    baseline_lat,
+    baseline_lon,
+    df_window.index
+)
+
+# ---- Collect gates that any trajectory intersects ----
+
+def gate_key(gate):
+    # convert gate [[lon1, lat1], [lon2, lat2]] into a hashable key
+    return (tuple(gate[0]), tuple(gate[1]))
+
+gates_with_intersections = {}  # key -> gate
+
+# First: check which gates the baseline crosses
+for gate in gates:
+    if testIntersection(baseline_state, gate) is not None:
+        gates_with_intersections[gate_key(gate)] = gate
+
+# Then: loop over modified variants, score, and record any intersected gates
+for name, (lat_pred, lon_pred) in pred_results.items():
+    if name == "baseline":
+        continue
+
+    modified_state = trajectory_to_state_positions(
+        lat_pred,
+        lon_pred,
+        df_window.index
+    )
+
+    delta_t = scoreState(baseline_state, modified_state, gates)
+    print(f"{name}: {delta_t}")
+
+    # record any gates this modified trajectory crosses
+    for gate in gates:
+        if testIntersection(modified_state, gate) is not None:
+            gates_with_intersections[gate_key(gate)] = gate
+            # optional: break if you only care about the first gate per state
+            # break
+
 # 4. Plot map-style lat/lon for each variant
 plt.figure(figsize=(8, 8))
 
@@ -142,6 +185,21 @@ for name, (lat_pred, lon_pred) in pred_results.items():
 
 plt.scatter(lon_true[0], lat_true[0], c="green", marker="o", s=60, label="Start (true)")
 plt.scatter(lon_true[-1], lat_true[-1], c="red", marker="x", s=60, label="End (true)")
+
+# ---- Plot gates that got intersections ----
+gate_label_added = False
+for gate in gates_with_intersections.values():
+    (x1, y1), (x2, y2) = gate  # [lon, lat] pairs
+    label = "Gate (intersected)" if not gate_label_added else None
+    plt.plot(
+        [x1, x2],
+        [y1, y2],
+        linewidth=1.5,
+        alpha=0.7,
+        color="red",
+        label=label,
+    )
+    gate_label_added = True
 
 plt.xlabel("Longitude")
 plt.ylabel("Latitude")

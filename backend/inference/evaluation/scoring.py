@@ -27,7 +27,6 @@ def intersect(segment1: list, segment2: list):
     '''
     return ccw(segment1[0],segment2[0],segment2[1]) != ccw(segment1[1],segment2[0],segment2[1]) and ccw(segment1[0],segment1[1],segment2[0]) != ccw(segment1[0],segment1[1],segment2[1])
 
-# Gate intersections functions
 
 def findIntersection(state: list[StatePosition], gates: list[list]):
     '''
@@ -35,38 +34,34 @@ def findIntersection(state: list[StatePosition], gates: list[list]):
     '''
     initialTime = state[0].time
 
-    for index in range(len(state)):
-        if index < (len(state)-1):
-            print(f"{[state[index + 1].x, state[index + 1].y]} {index}" )
+    for index in range(len(state) - 1):
+        point1 = [state[index].x, state[index].y]
+        point2 = [state[index + 1].x, state[index + 1].y]
+        segment = [point1, point2]
 
-            point1 = [state[index].x, state[index].y]
-            point2 = [state[index + 1].x, state[index + 1].y]
+        for gate in gates:
+            if intersect(gate, segment):
+                intersectedGate = gate
+                time = state[index].time - initialTime
+                return intersectedGate, time
 
-            segment = [point1, point2]
+    return None
 
-            for gate in gates:
-                if intersect(gate, segment):
-                    intersectedGate = gate
-                    time = state[index].time - initialTime
-
-                    return intersectedGate, time
 
 def testIntersection(state: list[StatePosition], gate: list):
-    '''
-    Finds the time for a state to cross a certain gate
-    '''
     initialTime = state[0].time
 
-    for index in range(len(state)):
-        if index  < (len(state)-1):
-            point1 = [state[index].x, state[index].y]
-            point2 = [state[index + 1].x, state[index + 1].y]
+    for index in range(len(state) - 1):
+        point1 = [state[index].x, state[index].y]
+        point2 = [state[index + 1].x, state[index + 1].y]
+        segment = [point1, point2]
 
-            segment = [point1, point2]
+        if intersect(gate, segment):
+            time = state[index].time - initialTime
+            return time
 
-            if intersect(gate, segment):
-                time = state[index].time - initialTime
-                return time
+    return None
+
 
 def scoreState(originalState: list[StatePosition], modifiedState: list[StatePosition], gates: list[list]): #This might be modified to calculate for a list of modified states because it feels wasteful to recalculated base time every time
     '''
