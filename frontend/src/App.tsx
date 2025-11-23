@@ -1,9 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
 import type { LatLngTuple } from 'leaflet';
 import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
+import VehicleSelector from './components/VehicleSelector';
+
+
+// ================ CONSTANTS ================
 
 const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
 
@@ -12,18 +16,33 @@ export interface LatestPositions {
   [index: number]: LatLngTuple;
 }
 
-export default function App() {
-  const [latestPositions, setLatestPositions] = useState<LatestPositions>({}); // Store the latest position
+export interface DriverInsight {
+  startPosition: LatLngTuple;
+  insight: string;
+}
 
-  // Mocked values for back end 
-  const LapTime = 10;
+export default function App() {
+
+  // ================ STATE ================
+
+  // Latest vehicle positions
+  const [latestPositions, setLatestPositions] = useState<LatestPositions>({});
+
+  // Laps numbers and times
+  const [currentLap, setCurrentLap] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<number>(0);
-  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([
-    { number: 1, time: 92.5 },
-    { number: 2, time: 90.2 },
-    { number: 3, time: 95.1 },
-  ]);
-  const lapAppended = useRef(false); 
+  const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
+
+  // Vehicle selection
+  const [vehicles, setVehicles] = useState<Array<number>>([]);
+  const [selectedVehicleID, setSelectedVehicleID] = useState<number | null>(null);
+  const [showOption, setShowOption] = useState<'all' | 'primary'>('all');
+
+  // Driver insights
+  const [latestInsight, setLatestInsight] = useState<DriverInsight | null>(null);
+
+
+  // ================ QUERY BACKEND ================
 
   const fetchLatestPosition = async () => {
     try {
@@ -39,59 +58,192 @@ export default function App() {
     }
   };
 
-  // Polling function for fetching latest GPS position
+  const fetchLatestLaps = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/currentLaps?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        setLaps([]);    // fallback
+        return;
+      }
+
+      const data = await response.json();
+
+      // Validate array shape
+      if (Array.isArray(data)) {
+        setLaps(data);
+      } else {
+        console.error("Lap fetch returned non-array:", data);
+        setLaps([]);    // fallback
+      }
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+      setLaps([]);      // fallback
+    }
+  };
+
+  const fetchCurrentLap = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/currentLap?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      setCurrentLap(data["currentLap"]);
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+    }
+  };
+
+  const fetchCurrentTime = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/currentLapTime?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Validate array shape
+      setCurrentTime(data["currentLapTime"]);
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/vehicles'); // Your endpoint
+      if (!response.ok) {
+        throw new Error(`Failed to fetch vehicles. Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Validate that the data is an array of numbers (vehicle IDs)
+      if (Array.isArray(data) && data.every((item: any) => typeof item === 'number')) {
+        setVehicles(data); // return the array of vehicle IDs
+      } else {
+        throw new Error('Invalid vehicle data');
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching vehicles:', error);
+      setVehicles([]); // Return an empty array in case of error
+    }
+  };
+
+  const fetchInsight = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/driverInsightFake?vehicleID=${selectedVehicleID}`);
+
+      // Handle non-2xx status codes
+      if (!response.ok) {
+        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+
+      const insight: DriverInsight = {
+        startPosition: [data["startLat"], data["startLon"]],
+        insight: data["driverInsight"]
+      }
+
+      // Validate array shape
+      setLatestInsight(insight);
+
+    } catch (error) {
+      // Handles network errors, server down, CORS failures, JSON fail, etc.
+      console.error('Error fetching laps:', error);
+    }
+  };
+
+  // ================ POLLING LOOPS ================
+
+  // Poll latest position of all cars
+  const positionPollMs = 500;
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
-    }, 50); // Poll period
+      fetchVehicles();
+
+      // Only fetch latest laps if selectedVehicleID is not null
+      if (selectedVehicleID !== null) {
+        fetchLatestLaps();
+        fetchCurrentLap();
+        fetchCurrentTime();
+      }
+
+    }, positionPollMs);
 
     // Fetch the first position right away
     fetchLatestPosition();
 
     // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, []); // Empty dependency array to run the effect only once on mount
+  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
 
-// Increments the timer (THIS WILL BE DELETED LATER !!!)
+
+  // Poll backend for driver insights
+  const insightPollMs = 10000;
   useEffect(() => {
     const intervalId = setInterval(() => {
-      setCurrentTime(prev => parseFloat((prev + 0.1).toFixed(1)));
-    }, 100);
+      if (selectedVehicleID !== null) {
+        fetchInsight();
+      }
+    }, insightPollMs);
 
+    // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, []);
+  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
 
-  // Watch currentTime and append lap when threshold is crossed
-  useEffect(() => {
-    if (currentTime >= LapTime && !lapAppended.current) {
-      setLaps(prev => [...prev, { number: prev.length + 1, time: currentTime }]);
-      setCurrentTime(0); // reset timer
-      lapAppended.current = true; // mark as appended
-    }
-
-    if (currentTime < LapTime) {
-      lapAppended.current = false; // reset flag for next lap
-    }
-  }, [currentTime]);
-
+  // ================ RETURN ================
 
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
 
-      <LapDisplay
-        currentLap={4} // Locked for now, should come from backend
-        currentTime={currentTime} // Current time for the lap is being mocked
-        laps={laps} // Mocked laps data until its added
+      {selectedVehicleID && (
+        <LapDisplay
+          currentLap={currentLap} // Locked for now, should come from backend
+          currentTime={currentTime} // Current time for the lap is being mocked
+          laps={laps} // Mocked laps data until its added
+        />
+      )}
+
+      <VehicleSelector
+        vehicleID={selectedVehicleID}
+        showOption={showOption}
+        vehicles={vehicles}
+        setVehicleID={setSelectedVehicleID}
+        setShowOption={setShowOption}
       />
 
       <MapContainer
         center={initialPosition}
         zoom={16}
+        zoomControl={false}
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
       >
-        {/* Use Google Maps Satellite tiles */}
+        {/* Use Satellite tiles */}
         <TileLayer
           attribution='&copy; <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online">Esri</a> contributors'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
@@ -99,8 +251,21 @@ export default function App() {
 
         {/* Display only the newest position as a marker */}
         {latestPositions && (
-          <VehicleMarkers positions={latestPositions}/>
+          <VehicleMarkers positions={latestPositions} showOption={showOption} selectedVehicleID={selectedVehicleID}/>
         )}
+
+        {/* Display driver insights on the track */}
+        {/* Modern styled marker for the latest driver insight */}
+        {latestInsight && selectedVehicleID && (
+          <CircleMarker
+            center={latestInsight.startPosition}
+            radius={0} // Size of the circle
+            weight={0} // Border width
+          >
+            <Tooltip permanent>{latestInsight.insight}</Tooltip>
+          </CircleMarker>
+        )}
+
       </MapContainer>
     </div>
   );
