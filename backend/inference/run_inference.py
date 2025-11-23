@@ -1,12 +1,12 @@
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import os
 import datetime as dt
 import pandas as pd
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
-from inference.prediction import PathPredictor
+from inference.prediction import prepare_tickdb_dataframe_for_model, CarTrajectoryPredictor
+from inference.models import MODEL_PATH
 
 
 # 1. Connect to tickdb
@@ -75,6 +75,12 @@ vehicle_id = 36
 df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=20.0)
 print(df_window.head())
 print(len(df_window))
+print(df_window.index.to_series().diff().describe())
+print("TickDB head (post-rename):")
+print(df_window.head())
+
+print("\nBasic stats:")
+print(df_window.describe())
 
 # pred_states is a NumPy array with columns in STATE_COLS order
 
@@ -82,15 +88,23 @@ lat_true = df_window["VBOX_Lat_Min"].to_numpy()
 lon_true = df_window["VBOX_Long_Minutes"].to_numpy()
 
 # 2. Predicted GPS from PathPredictor
-predictor = PathPredictor()
-(lat_pred, lon_pred), (lat_true, lon_true) = predictor.predict(df_window)  # (lat, lon)
+state   = ["accx", "accy", "speed", "nmot", "latitude", "longitude"]
+control = ["gear", "aps", "pbrake_f", "pbrake_r"]
 
-# 3. Align lengths if needed
-n = min(len(lat_true), len(lat_pred))
-lat_true = lat_true[:n]
-lon_true = lon_true[:n]
-lat_pred = lat_pred[:n]
-lon_pred = lon_pred[:n]
+
+df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
+
+predictor = CarTrajectoryPredictor(
+    df_xy=df_model,
+    state_cols=state,
+    control_cols=control,
+    model_path=str(MODEL_PATH / "car13_multistep_model.pt"),
+    scaler_path=str(MODEL_PATH / "car13_multistep_scaler.pkl"),
+    seq_len=10,
+    scale=50.0,
+)
+
+true_lat, true_lon, lat_pred, lon_pred = predictor.predict()
 
 # 4. Plot map-style lat/lon
 plt.figure(figsize=(8, 8))

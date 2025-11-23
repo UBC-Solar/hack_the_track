@@ -17,11 +17,14 @@ class RNN(nn.Module):
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
+        # x: [batch, seq_len, input_size]
         batch_size = x.size(0)
         device = x.device
+
         h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
         c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size, device=device)
-        out, _ = self.lstm(x, (h0, c0))
-        last_hidden = out[:, -1, :]
-        out = self.fc(last_hidden)
+
+        out, _ = self.lstm(x, (h0, c0))   # [batch, seq_len, hidden_size]
+        last_hidden = out[:, -1, :]       # [batch, hidden_size]
+        out = self.fc(last_hidden)        # [batch, output_size]
         return out
