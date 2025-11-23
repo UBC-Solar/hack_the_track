@@ -81,7 +81,6 @@ def plot_free_running_rollout(
     state_cols,
     control_cols,
     scale,
-    origin_rad,
     horizon=500,
     start_idx=2000,
     title_suffix="Δ-state model",

@@ -76,8 +76,9 @@ def prepare_tickdb_dataframe_for_model(df_tick, state_cols, control_cols):
         "pbrake_r": "pbrake_r",
         "VBOX_Lat_Min": "latitude",
         "VBOX_Long_Minutes": "longitude",
+        "Steering_Angle": "steering_angle",
     }
-
+    print(df_tick.columns)
     df = df_tick.copy()
     df.rename(columns=rename_map, inplace=True)
 

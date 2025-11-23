@@ -22,7 +22,7 @@ class CarTrajectoryPredictor:
         scaler_path="car13_scaler.pkl",
         seq_len=10,
         scale=50.0,
-        hidden_size=256,
+        hidden_size=128,
         num_layers=2,
         dropout=0.0,
         device=None,
