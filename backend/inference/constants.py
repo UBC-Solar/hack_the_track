@@ -16,4 +16,4 @@ telemetry_names = [
 
 DB_URL = "postgresql+psycopg2://racer:changeme@100.120.36.75:5432/racing"
 state   = ["accx", "accy", "speed", "nmot", "latitude", "longitude"]
-control = ["gear", "aps", "pbrake_f", "pbrake_r"]
+control = ["gear", "aps", "pbrake_f", "pbrake_r", "steering_angle"]

@@ -78,8 +78,8 @@ df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
 predictor = CarTrajectoryPredictor(
     state_cols=state,
     control_cols=control,
-    model_path=str(MODEL_PATH / "multicar_multistep_model.pt"),
-    scaler_path=str(MODEL_PATH / "multicar_multistep_scaler.pkl"),
+    model_path=str(MODEL_PATH / "new_multicar_multistep_model.pt"),
+    scaler_path=str(MODEL_PATH / "new_multicar_multistep_scaler.pkl"),
     seq_len=10,
     scale=100.0,
 )

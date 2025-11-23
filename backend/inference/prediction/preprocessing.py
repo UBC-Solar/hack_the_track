@@ -51,20 +51,10 @@ def combine_dfs_car(telemetry_names, common_index, all_dfs):
 
 def prepare_tickdb_dataframe_for_model(df_tick, state_cols, control_cols):
     """
-    Convert a dataframe pulled from tickdb into the unified dataframe format
-    used to train the RNN model.
-
-    - Renames tickdb signal names → model names
-    - Adds x/y from latitude/longitude
-    - Returns (df_ready, origin_rad)
-
-    Assumes:
-      - df_tick has a proper datetime index
-      - already at correct sampling rate
-      - no resampling required
+    Prepare tickdb dataframe for RNN inference.
+    Produces a dataframe identical in shape/semantics to the training input.
     """
 
-    # --- rename tickdb fields → model fields ---
     rename_map = {
         "accx_can": "accx",
         "accy_can": "accy",
@@ -78,23 +68,31 @@ def prepare_tickdb_dataframe_for_model(df_tick, state_cols, control_cols):
         "VBOX_Long_Minutes": "longitude",
         "Steering_Angle": "steering_angle",
     }
-    print(df_tick.columns)
-    df = df_tick.copy()
-    df.rename(columns=rename_map, inplace=True)
 
     df = df_tick.copy()
     df.rename(columns=rename_map, inplace=True)
 
-    # basic forward-fill/backward-fill on the raw columns we care about
-    fill_cols = list(rename_map.values())
-    df[fill_cols] = df[fill_cols].ffill().bfill()
+    # ---- drop duplicates & sort (training pipeline did this) ----
+    df = df[~df.index.duplicated(keep="first")]
+    df = df.sort_index()
 
-    # --- required *raw* fields (exclude x,y because we create them) ---
+    # ---- fill numeric columns like training did (minus interpolate) ----
+    numeric_cols = [c for c in rename_map.values() if c in df.columns]
+
+    df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+
+    # forward/back fill
+    df[numeric_cols] = df[numeric_cols].ffill().bfill()
+
+    # ---- ensure required fields exist ----
     base_state_cols = [c for c in state_cols if c not in ("x", "y")]
     required = set(base_state_cols + control_cols + ["latitude", "longitude"])
-
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Tick DB dataframe missing fields: {missing}")
+
+    # ---- final column ordering matches scaler ----
+    ordered_cols = state_cols + control_cols
+    df = df[ordered_cols]
 
     return df
