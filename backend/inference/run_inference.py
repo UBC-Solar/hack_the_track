@@ -1,12 +1,10 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import datetime as dt
 import pandas as pd
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
 from inference.prediction import prepare_tickdb_dataframe_for_model, CarTrajectoryPredictor
 from inference.models import MODEL_PATH
+from inference.constants import state, control
 
 
 # 1. Connect to tickdb
@@ -87,15 +85,9 @@ print(df_window.describe())
 lat_true = df_window["VBOX_Lat_Min"].to_numpy()
 lon_true = df_window["VBOX_Long_Minutes"].to_numpy()
 
-# 2. Predicted GPS from PathPredictor
-state   = ["accx", "accy", "speed", "nmot", "latitude", "longitude"]
-control = ["gear", "aps", "pbrake_f", "pbrake_r"]
-
-
 df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
 
 predictor = CarTrajectoryPredictor(
-    df_xy=df_model,
     state_cols=state,
     control_cols=control,
     model_path=str(MODEL_PATH / "car13_multistep_model.pt"),
@@ -104,7 +96,7 @@ predictor = CarTrajectoryPredictor(
     scale=50.0,
 )
 
-true_lat, true_lon, lat_pred, lon_pred = predictor.predict()
+true_lat, true_lon, lat_pred, lon_pred = predictor.predict(df_model)
 
 # 4. Plot map-style lat/lon
 plt.figure(figsize=(8, 8))
