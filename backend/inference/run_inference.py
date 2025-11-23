@@ -1,18 +1,10 @@
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import os
 import datetime as dt
 import pandas as pd
 from sqlalchemy import create_engine, text
 import matplotlib.pyplot as plt
-from backend.inference.prediction import PathPredictor
-import pandas as pd
-import numpy as np
-from os import rename
-from sqlalchemy.testing.util import total_size
-
-
+from inference.prediction import prepare_tickdb_dataframe_for_model, CarTrajectoryPredictor
+from inference.models import MODEL_PATH
+from inference.constants import state, control
 
 
 # 1. Connect to tickdb
@@ -50,7 +42,8 @@ def load_tick_window(
             pbrake_f,
             pbrake_r,
             "VBOX_Lat_Min",
-            "VBOX_Long_Minutes"
+            "VBOX_Long_Minutes",
+            "Steering_Angle"
         FROM telem_tick
         WHERE vehicle_id = :vehicle_id
           AND ts >= :start_time
@@ -79,43 +72,82 @@ def load_tick_window(
 vehicle_id = 36
 
 df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=20.0)
-print(df_window.head())
-print(len(df_window))
+df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
 
-# pred_states is a NumPy array with columns in STATE_COLS order
+# Utility: run prediction and return (lat_pred, lon_pred)
+predictor = CarTrajectoryPredictor(
+    state_cols=state,
+    control_cols=control,
+    model_path=str(MODEL_PATH / "multicar_multistep_model.pt"),
+    scaler_path=str(MODEL_PATH / "multicar_multistep_scaler.pkl"),
+    seq_len=10,
+    scale=100.0,
+)
 
-lat_true = df_window["VBOX_Lat_Min"].to_numpy()
-lon_true = df_window["VBOX_Long_Minutes"].to_numpy()
+def run_prediction_with_mod(df_mod: pd.DataFrame):
+    true_lat, true_lon, lat_pred, lon_pred = predictor.predict(df_mod)
+    return lat_pred, lon_pred
 
-# 2. Predicted GPS from PathPredictor
-predictor = PathPredictor()
-(lat_pred, lon_pred), (lat_true, lon_true) = predictor.predict(df_window)  # (lat, lon)
+# ---- Create modified variants ----
 
-# 3. Align lengths if needed
-n = min(len(lat_true), len(lat_pred))
-lat_true = lat_true[:n]
-lon_true = lon_true[:n]
-lat_pred = lat_pred[:n]
-lon_pred = lon_pred[:n]
+df_variants = {}
 
-# 4. Plot map-style lat/lon
+# 1. Baseline (already done, but add for consistency)
+df_variants["baseline"] = df_model.copy()
+
+# 2. Double the steering angle
+if "steering_angle" in df_model.columns:
+    df_mod = df_model.copy()
+    df_mod["steering_angle"] = df_mod["steering_angle"] * 2.0
+    df_variants["steering_x2"] = df_mod
+else:
+    print("WARNING: steering_angle not found in df_model columns!")
+
+# 3. Decrease both brake pressures by 25%
+df_mod = df_model.copy()
+df_mod["pbrake_f"] = df_mod["pbrake_f"] * 0.75
+df_mod["pbrake_r"] = df_mod["pbrake_r"] * 0.75
+df_variants["brakes_minus25pct"] = df_mod
+
+# 4. Gear +1
+df_mod = df_model.copy()
+df_mod["gear"] = df_mod["gear"] + 1
+df_variants["gear_plus1"] = df_mod
+
+# 5. Gear -1
+df_mod = df_model.copy()
+df_mod["gear"] = df_mod["gear"] - 1
+df_variants["gear_minus1"] = df_mod
+
+
+# ---- Run predictions ----
+
+pred_results = {}  # name -> (lat_pred, lon_pred)
+
+for name, df_mod in df_variants.items():
+    print(f"Running variant: {name}")
+    lat_pred, lon_pred = run_prediction_with_mod(df_mod)
+    pred_results[name] = (lat_pred, lon_pred)
+
+lat_true, lon_true, _, _ = predictor.predict(df_model)
+
+# 4. Plot map-style lat/lon for each variant
 plt.figure(figsize=(8, 8))
 
-plt.plot(lon_true, lat_true, label="True", linewidth=2)
-plt.plot(lon_pred, lat_pred, label="Predicted", linestyle="--", linewidth=2)
+plt.plot(lon_true, lat_true, label="True", linewidth=2, color="black")
 
-# Optional: mark start/end points
+# Plot each variant
+for name, (lat_pred, lon_pred) in pred_results.items():
+    plt.plot(lon_pred, lat_pred, label=name, linestyle="--", linewidth=1.5)
+
 plt.scatter(lon_true[0], lat_true[0], c="green", marker="o", s=60, label="Start (true)")
 plt.scatter(lon_true[-1], lat_true[-1], c="red", marker="x", s=60, label="End (true)")
 
-plt.scatter(lon_pred[0], lat_pred[0], c="green", marker="o", s=30, alpha=0.6)
-plt.scatter(lon_pred[-1], lat_pred[-1], c="red", marker="x", s=30, alpha=0.6)
-
 plt.xlabel("Longitude")
 plt.ylabel("Latitude")
-plt.title("Predicted vs True Trajectory")
+plt.title("Predicted vs True Trajectory (All Control Variants)")
 plt.legend()
-plt.gca().set_aspect("equal", "box")   # keep geometry realistic
+plt.gca().set_aspect("equal", "box")
 plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.show()

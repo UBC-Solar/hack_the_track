@@ -1,68 +1,291 @@
 # backend/main.py
-from fastapi import FastAPI, HTTPException
-from sqlalchemy import create_engine, MetaData, Table, select, desc, text
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+
+"""
+Telemetry Backend Service
+-------------------------
+Provides telemetry data endpoints, GPS lap extraction,
+per-vehicle queries, and fake vehicle telemetry generation.
+"""
+
+# -------------------------------------------------------------
+# Imports
+# -------------------------------------------------------------
 from datetime import datetime, timezone
-from confluent_kafka import Producer
-from math import cos, sin, radians, degrees, pi
-from datetime import datetime
 import json
 import os
+from math import cos, sin, radians, pi
+from random import random
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from sqlalchemy import create_engine, MetaData, Table, select, desc, text
+
+from confluent_kafka import Producer
 
 from load_gps_data import get_lap_gps_data, data_path
 
 
-app = FastAPI()
+# -------------------------------------------------------------
+# FastAPI App Initialization
+# -------------------------------------------------------------
+app = FastAPI(title="Telemetry Backend")
 
-# Allow frontend to call backend (important for local dev)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten later if you like, e.g. ["http://localhost:5173"]
+    allow_origins=["*"],   # NOTE: tighten in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello World!"}
 
-@app.get("/laps/")
-def get_example_lap(lapNumber: int, samplePeriod: int = 1):
-    barber_tel_path = data_path / "barber-motorsports-park" / "barber" / "Race 1" / "R1_barber_telemetry_data.csv"
-    lat_df, lon_df = get_lap_gps_data(barber_tel_path, lapNumber, chunksize=100000, chunk_limit=None)
-    lat_vals = lat_df['telemetry_value'][::samplePeriod]
-    lon_vals = lon_df['telemetry_value'][::samplePeriod]
-    return {"lat_vals": list(lat_vals), "lon_vals": list(lon_vals)}
-
+# -------------------------------------------------------------
+# Configuration / Environment
+# -------------------------------------------------------------
 PG_DSN = os.getenv("PG_DSN", "postgresql://telemetry:telemetry@localhost:5432/telemetry")
 TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
 
-# Create SQLAlchemy engine
+BROKER = os.getenv("BROKER", "localhost:9092")
+CONTROL_TOPIC = os.getenv("CONTROL_TOPIC", "tick.control")
+
+# -------------------------------------------------------------
+# Database Setup
+# -------------------------------------------------------------
 engine = create_engine(PG_DSN, future=True)
 metadata = MetaData()
 tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 
-@app.get("/latest")
-def get_latest_row():
+# Kafka producer (initialized in startup event)
+producer: Producer | None = None
+
+
+# -------------------------------------------------------------
+# Routes: Basic
+# -------------------------------------------------------------
+@app.get("/")
+def read_root():
+    return {"message": "Hello World!"}
+
+
+# -------------------------------------------------------------
+# Routes: GPS Lap Data
+# -------------------------------------------------------------
+@app.get("/laps/")
+def get_example_lap(lapNumber: int, samplePeriod: int = 1):
+    """
+    Returns down-sampled GPS data for a specific lap.
+    """
+    barber_path = (
+        data_path
+        / "barber-motorsports-park"
+        / "barber"
+        / "Race 1"
+        / "R1_barber_telemetry_data.csv"
+    )
+
+    lat_df, lon_df = get_lap_gps_data(barber_path, lapNumber, chunksize=100000)
+
+    lat_vals = lat_df["telemetry_value"][::samplePeriod]
+    lon_vals = lon_df["telemetry_value"][::samplePeriod]
+
+    return {"lat_vals": list(lat_vals), "lon_vals": list(lon_vals)}
+
+
+# -------------------------------------------------------------
+# Routes: Telemetry Queries
+# -------------------------------------------------------------
+@app.get("/currentLaps")
+def get_current_laps(vehicleID: str):
+    """
+    Get lap times for a specified vehicle, excluding the current lap.
+    """
     try:
         with engine.connect() as conn:
-            stmt = select(tick_table).order_by(desc(tick_table.c.ts)).limit(1)
-            result = conn.execute(stmt).mappings().fetchone()
+            # First, we query to get the current lap (the one with the most recent timestamp)
+            current_lap_stmt = text("""
+                SELECT lap
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            # Execute the query to get the current lap number
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            # If no laps are found for the vehicle, raise an error
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            current_lap = current_lap_result["lap"]
+
+            # Query to get the first and last timestamps for each lap, excluding the current lap
+            stmt = text("""
+                SELECT
+                    lap,
+                    MIN(ts) AS first_timestamp,
+                    MAX(ts) AS last_timestamp
+                FROM
+                    telem_tick
+                WHERE
+                    vehicle_id = :vehicle_id
+                    AND lap != :current_lap  -- Exclude the current lap
+                GROUP BY
+                    lap
+                ORDER BY
+                    lap;
+            """)
+
+            # Execute the query and fetch the results
+            result = conn.execute(stmt, {"vehicle_id": vehicleID, "current_lap": current_lap}).mappings().fetchall()
+
+            # If no laps are found (after excluding current lap), raise an error
             if not result:
-                raise HTTPException(status_code=404, detail="No telemetry data found")
-            return dict(result)
+                raise HTTPException(status_code=404, detail="No lap data found for this vehicle.")
+
+            # Calculate lap times (difference between first and last timestamp)
+            lap_times = []
+            for row in result:
+                lap_number = row["lap"]
+                first_timestamp = row["first_timestamp"]
+                last_timestamp = row["last_timestamp"]
+                if first_timestamp and last_timestamp:
+                    # Calculate the time difference in seconds
+                    lap_time = (last_timestamp - first_timestamp).total_seconds()
+                    lap_times.append({"number": lap_number, "time": lap_time})
+
+            return lap_times
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/latestAll")
-def get_latest_all():
+@app.get("/currentLap")
+def get_current_lap(vehicleID: str):
+    """
+    Returns the current lap for the selected vehicle.
+    This is determined by the most recent telemetry data for that vehicle.
+    """
     try:
         with engine.connect() as conn:
+            # Query to get the most recent telemetry data for the given vehicle
+            current_lap_stmt = text("""
+                SELECT lap
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
 
-            # Get a table with rows containing the most recent lat/lon for each distinct vehicle
-            sql_txt = f"""
+            # Execute the query to get the current lap number
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            # Return the current lap number
+            return {"currentLap": current_lap_result["lap"]}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/currentLapTime")
+def get_current_lap_time(vehicleID: str):
+    """
+    Returns the current lap time for the selected vehicle.
+    This is calculated by finding the difference between the current time and the first timestamp
+    of the vehicle's current lap.
+    """
+    try:
+        with engine.connect() as conn:
+            # Query to get the current lap number and time (based on most recent telemetry)
+            current_lap_stmt = text("""
+                SELECT lap, ts
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                ORDER BY ts DESC
+                LIMIT 1;
+            """)
+
+            current_lap_result = conn.execute(current_lap_stmt, {"vehicle_id": vehicleID}).mappings().fetchone()
+
+            if not current_lap_result:
+                raise HTTPException(status_code=404, detail="No telemetry data found for this vehicle.")
+
+            current_lap = current_lap_result["lap"]
+            current_ts = current_lap_result["ts"]
+
+            # Query to get the first timestamp for the current lap
+            first_timestamp_stmt = text("""
+                SELECT MIN(ts) AS first_timestamp
+                FROM telem_tick
+                WHERE vehicle_id = :vehicle_id
+                AND lap = :current_lap;
+            """)
+
+            first_timestamp_result = conn.execute(first_timestamp_stmt, {"vehicle_id": vehicleID, "current_lap": current_lap}).mappings().fetchone()
+
+            if not first_timestamp_result or not first_timestamp_result["first_timestamp"]:
+                raise HTTPException(status_code=404, detail="No telemetry data found for the current lap.")
+
+            first_timestamp = first_timestamp_result["first_timestamp"]
+
+            # Calculate the difference between current time and first timestamp of the lap
+            lap_time_seconds = (current_ts - first_timestamp).total_seconds()
+
+            return {"currentLapTime": lap_time_seconds}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/vehicles")
+def list_all_vehicles():
+    """
+    Returns all vehicle IDs present in the telemetry table.
+    """
+    try:
+        with engine.connect() as conn:
+            stmt = text("SELECT DISTINCT vehicle_id FROM telem_tick")
+            rows = conn.execute(stmt).mappings().fetchall()
+
+            if not rows:
+                raise HTTPException(status_code=404, detail="No telemetry data found")
+
+            return [row["vehicle_id"] for row in rows]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/latest")
+def get_latest_row():
+    """
+    Returns the latest telemetry tick entry.
+    """
+    try:
+        with engine.connect() as conn:
+            stmt = select(tick_table).order_by(desc(tick_table.c.ts)).limit(1)
+            row = conn.execute(stmt).mappings().fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="No telemetry data found")
+
+            return dict(row)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/latestAll")
+def get_latest_all():
+    """
+    Returns the most recent telemetry (lat/lon) for each distinct vehicle.
+    Only includes data from the last second.
+    """
+    try:
+        with engine.connect() as conn:
+            stmt = text("""
                 SELECT DISTINCT ON (vehicle_id)
                     ts,
                     vehicle_id,
@@ -71,91 +294,126 @@ def get_latest_all():
                 FROM telem_tick
                 WHERE ts > now() - interval '1 second'
                 ORDER BY vehicle_id, ts DESC;
-            """
-            stmt = text(sql_txt)
+            """)
 
-            result = conn.execute(stmt).mappings().fetchall()
+            rows = conn.execute(stmt).mappings().fetchall()
 
-            if not result:
+            if not rows:
                 raise HTTPException(status_code=404, detail="No telemetry data found")
 
-            # Create a mapping from vehicle ids to most recent position
-
-            veh_locations: dict[int, tuple[float, float]] = {
-                veh_row['vehicle_id']: (veh_row['VBOX_Lat_Min'], veh_row['VBOX_Long_Minutes']) for veh_row in result
+            return {
+                row["vehicle_id"]: (row["VBOX_Lat_Min"], row["VBOX_Long_Minutes"])
+                for row in rows
             }
 
-            return veh_locations
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# -------------------------------------------------------------
+# Dummy Functions
+# -------------------------------------------------------------
 @app.get("/latestAllFake")
-def get_latest_all_fake(num_cars: int = 12, radius_m: float = 100, period_s: float = 5, center_coords = None):
-    """Return a dictionary of fake car GPS data
-
-    Will return 12 evenly spaced cars driving at constant speed in a circle at the center of the track.
+def get_latest_all_fake(
+    num_cars: int = 12,
+    radius_m: float = 100,
+    period_s: float = 5,
+    center_coords: tuple[float, float] | None = None,
+):
     """
-    earth_circumference = 40075.017 * 1000  # m
-    radius_deg = radius_m / earth_circumference * 360
-    center_coords = center_coords if center_coords is not None else (33.5325017, -86.6215766)
+    Returns fake vehicle telemetry for testing.
+    Cars drive in a circle around the track center.
+    """
+    earth_circ = 40075.017 * 1000  # meters
+    radius_deg = radius_m / earth_circ * 360
 
-    positions: dict[int, tuple[float, float]] = {}
+    if center_coords is None:
+        center_coords = (33.5325017, -86.6215766)
 
-    deg_per_car = 360 / num_cars
-    for car_i in range(num_cars):
+    results = {}
+    angle_step = 360 / num_cars
 
-        car_relative_angle = radians(deg_per_car * car_i)
-        current_time = datetime.now().timestamp() # seconds
-        phase = (current_time % period_s) * (2 * pi / period_s)
-        car_angle = car_relative_angle + phase
+    now = datetime.now().timestamp()
 
-        delta_lon = sin(car_angle) * radius_deg
-        delta_lat = cos(car_angle) * radius_deg
+    for i in range(num_cars):
+        base_angle = radians(angle_step * i)
+        phase = (now % period_s) * (2 * pi / period_s)
+        angle = base_angle + phase
 
-        positions[car_i] = (center_coords[0] + delta_lat, center_coords[1] + delta_lon)
+        d_lon = sin(angle) * radius_deg
+        d_lat = cos(angle) * radius_deg
 
-    return positions
+        results[i] = (center_coords[0] + d_lat, center_coords[1] + d_lon)
 
-# -------- Kafka control plumbing --------
-BROKER = os.getenv("BROKER", "localhost:9092")
-CONTROL_TOPIC = os.getenv("CONTROL_TOPIC", "tick.control")
+    return results
 
-producer: Producer | None = None
+@app.get("/driverInsightFake")
+def get_insight_fake(
+    vehicleID: int,
+):
+    """
+    Returns fake driver insights for testing
+    """
 
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+
+    rand = random()
+
+    if rand < 0.25: insight = "➡️ Steer Right +10%" 
+    elif rand < 0.5: insight = "⬅️ Steer Left +10%" 
+    elif rand < 0.75: insight = "⏩ Increase Acceleration +10%" 
+    else: insight = "⏪ Decrease Acceleration +10%" 
+
+    return {"startLat": lat, "startLon": lon, "driverInsight": insight}
+
+
+# -------------------------------------------------------------
+# Kafka Events
+# -------------------------------------------------------------
 @app.on_event("startup")
-def _init_kafka():
+def init_kafka():
+    """Initialize Kafka producer."""
     global producer
     try:
         producer = Producer({"bootstrap.servers": BROKER})
+        print("[INFO] Kafka producer initialized")
     except Exception as e:
-        # Don't crash the app; just make it clear controls won't work
-        print(f"[WARN] Failed to create Kafka producer: {e}")
+        print(f"[WARN] Kafka producer init failed: {e}")
         producer = None
 
+
 @app.on_event("shutdown")
-def _flush_kafka():
-    try:
-        if producer is not None:
+def flush_kafka():
+    """Flush Kafka producer on shutdown."""
+    if producer:
+        try:
             producer.flush(5)
-    except Exception:
-        pass
+        except Exception:
+            pass
+
 
 class TogglePayload(BaseModel):
     enable: bool
 
+
 @app.post("/control/tick-consumer")
 def toggle_tick_consumer(payload: TogglePayload):
     """
-    Publish a control message to enable/disable the tick-consumer.
-    Message format (JSON):
-      {"command":"toggle_write","write_enabled":<bool>,"ts":"<iso8601>"}
+    Controls tick-consumer via Kafka message.
     """
-    if producer is None:
+    if not producer:
         raise HTTPException(status_code=503, detail="Kafka producer not initialized")
 
     message = {
         "command": "toggle_write",
         "write_enabled": payload.enable,
+        "ts": datetime.now(timezone.utc).isoformat(),
     }
 
     try:
@@ -163,17 +421,21 @@ def toggle_tick_consumer(payload: TogglePayload):
             topic=CONTROL_TOPIC,
             value=json.dumps(message).encode("utf-8"),
         )
-        # Let librdkafka handle batching; flush lightly here if you want immediate delivery:
         producer.poll(0)
     except BufferError:
-        # If queue is full, try a quick flush and retry once
         producer.flush(1)
-        producer.produce(topic=CONTROL_TOPIC, value=json.dumps(message).encode("utf-8"))
+        producer.produce(
+            topic=CONTROL_TOPIC,
+            value=json.dumps(message).encode("utf-8"),
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Kafka produce failed: {e}")
 
     return {"ok": True, "sent": message}
 
 
+# -------------------------------------------------------------
+# Debug Execution
+# -------------------------------------------------------------
 if __name__ == "__main__":
-    print(get_latest_all_fake())
+    print(get_current_laps(36))
