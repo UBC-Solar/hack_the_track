@@ -12,7 +12,6 @@ class modify_control:
     def get_range(self, control_input):
         if control_input not in self.controls:
             raise ValueError(f"{control_input} is not a valid control")
-
         col = self.df[control_input]
         return col.min(), col.max()
 
