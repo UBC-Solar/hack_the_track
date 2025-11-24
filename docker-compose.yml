@@ -96,6 +96,7 @@ services:
       - ./replayer/replayer_data:/app/replayer_data  # schema init
     environment:
       BROKER: redpanda:9092
+      TOPIC: telem.stream_fast.raw
       RACE_NUMBER: "1"
       TRACK_NAME: "barber"
       SPEED: "1.0"
