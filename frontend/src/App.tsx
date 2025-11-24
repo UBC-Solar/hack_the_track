@@ -9,7 +9,7 @@ import DriverInsightsList from './components/DriverInsightsList';
 
 // ================ CONSTANTS ================
 
-const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
+const initialPosition: LatLngTuple = [33.532463, -86.618345];
 
 // Map car IDs to their most recent position
 export interface LatestPositions {
@@ -164,7 +164,7 @@ export default function App() {
 
       <MapContainer
         center={initialPosition}
-        zoom={16}
+        zoom={17}
         zoomControl={false}
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
