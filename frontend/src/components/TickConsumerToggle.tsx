@@ -1,11 +1,12 @@
 // src/components/TickConsumerToggle.tsx
 import { useState } from 'react';
+import { BACKEND_URL } from "../config.tsx";
 
 interface TickConsumerToggleProps {
   backendUrl?: string; // optional override (defaults to localhost)
 }
 
-export default function TickConsumerToggle({ backendUrl = 'http://localhost:8000' }: TickConsumerToggleProps) {
+export default function TickConsumerToggle({ backendUrl = `${BACKEND_URL}` }: TickConsumerToggleProps) {
   const [writeEnabled, setWriteEnabled] = useState<boolean>(false); // ⬅ default: disabled
   const [toggling, setToggling] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);

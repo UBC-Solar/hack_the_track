@@ -17,6 +17,8 @@ services:
     container_name: vite-frontend
     ports:
       - "5173:80"
+    environment:
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL}
     depends_on:
       - backend
 
@@ -76,12 +78,6 @@ services:
       CONTROL_TOPIC_REPLICATION: "1"
       CONTROL_TOPIC_COMPACT: "true"   # optional: compacted control topic
       BROKER_READY_TIMEOUT_SECS: "45"
-    healthcheck:
-      # succeed when the broker answers metadata requests
-      test: [ "CMD-SHELL", "rpk cluster info --brokers=localhost:9092 >/dev/null 2>&1" ]
-      interval: 2s
-      timeout: 2s
-      retries: 60
     restart: unless-stopped
 
   replayer:

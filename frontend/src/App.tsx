@@ -6,6 +6,7 @@ import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
 import VehicleSelector from './components/VehicleSelector';
 import DriverInsightsList from './components/DriverInsightsList';
+import { BACKEND_URL } from './config';
 
 // ================ CONSTANTS ================
 
@@ -49,7 +50,7 @@ export default function App() {
   const fetchLatestPosition = async () => {
     try {
       // Use /latestAll for actual data, or latestAllFake for mocked data
-      const response = await fetch('http://localhost:8000/latestAll/');
+      const response = await fetch(`${BACKEND_URL}/latestAll/`);
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
       if (data == null) throw new Error('Invalid position data');
@@ -62,7 +63,7 @@ export default function App() {
 
   const fetchLatestLaps = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/currentLaps?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`${BACKEND_URL}/currentLaps?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -90,7 +91,7 @@ export default function App() {
 
   const fetchCurrentLap = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/currentLap?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`${BACKEND_URL}/currentLap?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -110,7 +111,7 @@ export default function App() {
 
   const fetchCurrentTime = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/currentLapTime?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`${BACKEND_URL}/currentLapTime?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -131,7 +132,7 @@ export default function App() {
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch('http://localhost:8000/vehicles'); // Your endpoint
+      const response = await fetch(`${BACKEND_URL}/vehicles`); // Your endpoint
       if (!response.ok) {
         throw new Error(`Failed to fetch vehicles. Status: ${response.status}`);
       }
@@ -153,7 +154,7 @@ export default function App() {
 
   const fetchInsight = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/driverInsight?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`${BACKEND_URL}/driverInsight?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -232,7 +233,7 @@ export default function App() {
 
   return (
     <div>
-      <TickConsumerToggle backendUrl="http://localhost:8000" />
+      <TickConsumerToggle backendUrl={BACKEND_URL} />
 
       {selectedVehicleID && (
         <LapDisplay
