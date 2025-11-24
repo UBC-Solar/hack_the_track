@@ -151,7 +151,7 @@ export default function App() {
 
   const fetchInsight = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/driverInsightFake?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`http://localhost:8000/driverInsight?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -161,9 +161,12 @@ export default function App() {
 
       const data = await response.json();
 
+      const improvement_percent = data["improvement"] * 100
+      const sentence = `${data["driverInsight"]} to achieve ${improvement_percent}% time reduction`;
+
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],
-        insight: data["driverInsight"]
+        insight: sentence
       }
 
       // Validate array shape

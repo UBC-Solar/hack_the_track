@@ -443,21 +443,22 @@ def get_insight(
         pred_results,
         gates_with_intersections,
         best_controls,
-        best_improvement,
+        best_improvement_s,
     ) = get_insights(
         vehicleID,
         duration_s,
         control_modifications,
         predictor=predictor,
+        engine=engine,
     )
 
     # Print best control(s) and time improvement
-    if best_improvement is not None and best_controls:
+    if best_improvement_s is not None and best_controls:
         if len(best_controls) == 1:
             insight = best_controls[0]
             print(
                 f"\nBest control modification: {best_controls[0]} "
-                f"(Δt = {best_improvement:.3f} s vs baseline)"
+                f"(Δt = {best_improvement_s:.3f} s vs baseline)"
             )
         else:
             combo_str = " And ".join(best_controls)
@@ -465,12 +466,15 @@ def get_insight(
 
             print(
                 f"\nBest combined controls: {insight} "
-                f"(Δt = {best_improvement:.3f} s vs baseline)"
+                f"(Δt = {best_improvement_s:.3f} s vs baseline)"
             )
     else:
         insight = None
-        best_improvement = None
+        best_improvement_s = None
         print("\nNo beneficial control modifications found.")
+
+    if best_improvement_s:
+        best_improvement = best_improvement_s / duration_s
 
     return {"startLat": lat, "startLon": lon, "driverInsight": insight, "improvement": best_improvement}
 

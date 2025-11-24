@@ -306,6 +306,7 @@ def get_insights(
     duration_s: float = 5.0,
     modifications: List[ControlModification] | None = None,
     predictor: Optional[CarTrajectoryPredictor] = None,
+    engine = None,
 ):
     """
     Runs all (single) control modifications and evaluates their Δt vs baseline.
@@ -325,7 +326,9 @@ def get_insights(
     """
 
     # --- Data acquisition ---
-    engine = create_engine(TICKDB_URL)
+    if engine is None:
+        engine = create_engine(TICKDB_URL)
+
     df_window = load_tick_window(engine, vehicle_id, duration_s=duration_s)
 
     # --- Data processing: prep for model ---

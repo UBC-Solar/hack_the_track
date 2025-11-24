@@ -8,6 +8,7 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY load_gps_data.py main.py ./
 COPY telemetry/ ./telemetry
+COPY inference ./inference
 
 # Use uv to sync dependencies (no dev deps for production)
 RUN --mount=type=cache,target=/root/.cache/uv \
