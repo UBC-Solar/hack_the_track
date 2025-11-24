@@ -26,6 +26,7 @@ from confluent_kafka import Producer
 
 from load_gps_data import get_lap_gps_data, data_path
 
+from inference.insights import get_insights, ControlModification, make_predictor
 
 # -------------------------------------------------------------
 # FastAPI App Initialization
@@ -60,6 +61,49 @@ tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 # Kafka producer (initialized in startup event)
 producer: Producer | None = None
 
+
+predictor = make_predictor()
+
+control_modifications = [
+    ControlModification(
+        name="baseline",
+        apply=lambda df: df.copy(),
+    ),
+    ControlModification(
+        name="brakes_minus25pct",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 0.75,
+            pbrake_r=df["pbrake_r"] * 0.75,
+        ),
+    ),
+    ControlModification(
+        name="gear_plus1",
+        apply=lambda df: df.assign(gear=df["gear"] + 1),
+    ),
+    ControlModification(
+        name="gear_minus1",
+        apply=lambda df: df.assign(gear=df["gear"] - 1),
+    ),
+    ControlModification(
+        name="brakes_minus25pct",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 0.75,
+            pbrake_r=df["pbrake_r"] * 0.75,
+        ),
+    ),
+    ControlModification(
+        name="steering_x2",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] * 2.0),
+    ),
+    ControlModification(
+        name="steer_left",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 5.0),
+    ),
+    ControlModification(
+        name="steer_right",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 5.0),
+    )
+]
 
 # -------------------------------------------------------------
 # Routes: Basic
@@ -371,6 +415,64 @@ def get_insight_fake(
     else: insight = "⏪ Decrease Acceleration +10%" 
 
     return {"startLat": lat, "startLon": lon, "driverInsight": insight}
+
+# -------------------------------------------------------------
+# Insights
+# -------------------------------------------------------------
+
+@app.get("/driverInsight")
+def get_insight(
+    vehicleID: str,
+):
+    """
+    Returns fake driver insights for testing
+    """
+    duration_s = 5.0
+
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+
+    (
+        lat_true,
+        lon_true,
+        pred_results,
+        gates_with_intersections,
+        best_controls,
+        best_improvement,
+    ) = get_insights(
+        vehicleID,
+        duration_s,
+        control_modifications,
+        predictor=predictor,
+    )
+
+    # Print best control(s) and time improvement
+    if best_improvement is not None and best_controls:
+        if len(best_controls) == 1:
+            insight = best_controls[0]
+            print(
+                f"\nBest control modification: {best_controls[0]} "
+                f"(Δt = {best_improvement:.3f} s vs baseline)"
+            )
+        else:
+            combo_str = " And ".join(best_controls)
+            insight = combo_str
+
+            print(
+                f"\nBest combined controls: {insight} "
+                f"(Δt = {best_improvement:.3f} s vs baseline)"
+            )
+    else:
+        insight = None
+        best_improvement = None
+        print("\nNo beneficial control modifications found.")
+
+    return {"startLat": lat, "startLon": lon, "driverInsight": insight, "improvement": best_improvement}
 
 
 # -------------------------------------------------------------
