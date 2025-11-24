@@ -87,8 +87,8 @@ control_modifications = [
         ),
     ),
     ControlModification(
-        name="Steer 10° More Left",
-        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 10.0),
+        name="Steer 5° More Left",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 5.0),
     ),
 
     ControlModification(
