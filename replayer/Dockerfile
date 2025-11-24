@@ -5,7 +5,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 WORKDIR /app
 
 # Copy the necessary files, including the telemetry module
-COPY pyproject.toml uv.lock .env ./
+COPY pyproject.toml uv.lock ./
 COPY replayer.py  ./
 
 # Use uv to sync dependencies (no dev deps for production)

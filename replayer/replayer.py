@@ -7,10 +7,8 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv
 from confluent_kafka import Producer
 
-load_dotenv()
 
 # ---------------------------------------------------------------------
 # Command-line arguments
@@ -28,10 +26,6 @@ args = parser.parse_args()
 # ---------------------------------------------------------------------
 BROKER = os.getenv("BROKER")
 TOPIC = os.getenv("TOPIC")
-
-import os
-print(os.getcwd())
-print(os.listdir(os.getcwd()))
 
 RACE_NUMBER = int(os.getenv("RACE_NUMBER", "1"))
 TRACK_NAME = os.getenv("TRACK_NAME") or "unknown_track"
