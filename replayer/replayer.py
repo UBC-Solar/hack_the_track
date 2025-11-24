@@ -7,10 +7,8 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv
 from confluent_kafka import Producer
 
-load_dotenv()
 
 # ---------------------------------------------------------------------
 # Command-line arguments
@@ -33,10 +31,6 @@ RACE_NUMBER = int(os.getenv("RACE_NUMBER", "1"))
 TRACK_NAME = os.getenv("TRACK_NAME") or "unknown_track"
 SPEED = float(os.getenv("SPEED_MULTIPLIER", "1.0"))
 REPLAY_START_REL_S = float(os.getenv("REPLAY_START_REL_S", "60.0"))
-
-# NOTE: these are now *string* vehicle IDs (codes) matching the CSV, e.g. "GR86-022-13"
-VEHICLE_ID_ENV = os.getenv("VEHICLE_ID")
-VEHICLE_ID = VEHICLE_ID_ENV if VEHICLE_ID_ENV not in (None, "", "None") else None
 
 EXCLUDE_VEHICLE_IDS = [
     s for s in os.getenv("EXCLUDE_VEHICLE_IDS", "").replace(" ", "").split(",")
@@ -96,9 +90,6 @@ def get_time_bounds(csv_path: Path):
 
     for chunk in pd.read_csv(csv_path, chunksize=CHUNKSIZE):
         # Filter by vehicle if requested
-        if VEHICLE_ID is not None:
-            chunk = chunk[chunk["vehicle_id"] == VEHICLE_ID]
-
         if EXCLUDE_VEHICLE_IDS:
             chunk = chunk[~chunk["vehicle_id"].isin(EXCLUDE_VEHICLE_IDS)]
 
@@ -132,10 +123,6 @@ def stream_rows(csv_path: Path):
         chunksize=CHUNKSIZE,
         parse_dates=["timestamp"],  # parse timestamp to datetime
     ):
-        # Filter by vehicle
-        if VEHICLE_ID is not None:
-            chunk = chunk[chunk["vehicle_id"] == VEHICLE_ID]
-
         if EXCLUDE_VEHICLE_IDS:
             chunk = chunk[~chunk["vehicle_id"].isin(EXCLUDE_VEHICLE_IDS)]
 
@@ -172,10 +159,7 @@ def main():
     print(f"First relative time: {tmin:.6f} s")
     print(f"Last  relative time: {tmax:.6f} s (duration)")
 
-    if VEHICLE_ID is not None:
-        scope = f"vehicle_id={VEHICLE_ID}"
-    else:
-        scope = "ALL vehicles"
+    scope = "ALL vehicles"
 
     print(f"Race #{RACE_NUMBER} @ {TRACK_NAME} ({scope})")
 

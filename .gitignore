@@ -210,3 +210,4 @@ __marimo__/
 backend/data
 
 .DS_Store
+**/*.csv
