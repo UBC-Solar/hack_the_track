@@ -6,7 +6,7 @@ import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
 import VehicleSelector from './components/VehicleSelector';
 import InsightsHeader from './components/InsightsHeader';
-
+import DriverInsightsList from './components/DriverInsightsList';
 
 // ================ CONSTANTS ================
 
@@ -41,6 +41,8 @@ export default function App() {
 
   // Driver insights
   const [latestInsight, setLatestInsight] = useState<DriverInsight | null>(null);
+
+  const [driverInsightList, setDriverInsightList] = useState<Array<[string, number]>>([]);
 
 
   // ================ QUERY BACKEND ================
@@ -180,6 +182,8 @@ export default function App() {
       // Validate array shape
       setLatestInsight(insight);
 
+      setDriverInsightList(data.total_improvement_list ?? []);
+
     } catch (error) {
       // Handles network errors, server down, CORS failures, JSON fail, etc.
       console.error('Error fetching laps:', error);
@@ -239,6 +243,10 @@ export default function App() {
           currentTime={currentTime} // Current time for the lap is being mocked
           laps={laps} // Mocked laps data until its added
         />
+      )}
+
+      {selectedVehicleID && (
+        <DriverInsightsList insights={driverInsightList} />
       )}
 
       <VehicleSelector

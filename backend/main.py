@@ -24,6 +24,8 @@ from sqlalchemy import create_engine, MetaData, Table, select, desc, text
 
 from confluent_kafka import Producer
 
+from typing import Dict, List, Tuple
+
 from load_gps_data import get_lap_gps_data, data_path
 
 from inference.insights import get_insights, ControlModification, make_predictor
@@ -94,6 +96,11 @@ control_modifications = [
         apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 5.0),
     )
 ]
+
+# vehicle_insights Storage
+# -------------------------------
+
+vehicle_insights: Dict[str, List[Tuple[str, float]]] = {}  # vehicleID -> list of (driverInsight, improvement)
 
 # -------------------------------------------------------------
 # Routes: Basic
@@ -415,7 +422,8 @@ def get_insight(
     vehicleID: str,
 ):
     """
-    Returns fake driver insights for testing
+    Returns driver insight for a vehicle and keeps a cumulative list
+    of insights for that vehicle in memory.
     """
     duration_s = 5.0
 
@@ -465,9 +473,20 @@ def get_insight(
 
     if best_improvement_s:
         best_improvement = best_improvement_s * (-1.0)      # negative delta so make it positive to indicate time saved
+    
+    # --- Append to in-memory list ---
+    if vehicleID not in vehicle_insights:
+        vehicle_insights[vehicleID] = []
 
-    return {"startLat": lat, "startLon": lon, "driverInsight": insight, "improvement": best_improvement}
+    vehicle_insights[vehicleID].append((insight, best_improvement))
 
+    return {
+        "startLat": lat,
+        "startLon": lon,
+        "driverInsight": insight,
+        "improvement": best_improvement,
+        "total_improvement_list": vehicle_insights[vehicleID]
+    }
 
 # -------------------------------------------------------------
 # Kafka Events
