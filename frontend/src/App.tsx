@@ -22,33 +22,28 @@ export interface DriverInsight {
 }
 
 export default function App() {
-
   // ================ STATE ================
-
-  // Latest vehicle positions
   const [latestPositions, setLatestPositions] = useState<LatestPositions>({});
-
-  // Laps numbers and times
   const [currentLap, setCurrentLap] = useState<number>(1);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
-
-  // Vehicle selection
   const [vehicles, setVehicles] = useState<Array<string>>([]);
   const [selectedVehicleID, setSelectedVehicleID] = useState<string | null>(null);
   const [showOption, setShowOption] = useState<'all' | 'primary'>('all');
-
-  // Driver insights
   const [latestInsight, setLatestInsight] = useState<DriverInsight | null>(null);
-
   const [driverInsightList, setDriverInsightList] = useState<Array<[string, number]>>([]);
 
+  // ================ POPUP STATE ================
+  const [showPopup, setShowPopup] = useState(true); // Popup visibility state
+
+  const closePopup = () => {
+    setShowPopup(false); // Close the popup
+  };
 
   // ================ QUERY BACKEND ================
 
   const fetchLatestPosition = async () => {
     try {
-      // Use /latestAll for actual data, or latestAllFake for mocked data
       const response = await fetch('http://localhost:8000/latestAll/');
       if (!response.ok) throw new Error(`Failed to fetch latest position. Status: ${response.status}`);
       const data = await response.json();
@@ -63,159 +58,75 @@ export default function App() {
   const fetchLatestLaps = async () => {
     try {
       const response = await fetch(`http://localhost:8000/currentLaps?vehicleID=${selectedVehicleID}`);
-
-      // Handle non-2xx status codes
       if (!response.ok) {
         console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
-        setLaps([]);    // fallback
+        setLaps([]); 
         return;
       }
-
       const data = await response.json();
-
-      // Validate array shape
       if (Array.isArray(data)) {
         setLaps(data);
       } else {
         console.error("Lap fetch returned non-array:", data);
-        setLaps([]);    // fallback
+        setLaps([]);
       }
-
     } catch (error) {
-      // Handles network errors, server down, CORS failures, JSON fail, etc.
       console.error('Error fetching laps:', error);
-      setLaps([]);      // fallback
-    }
-  };
-
-  const fetchCurrentLap = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/currentLap?vehicleID=${selectedVehicleID}`);
-
-      // Handle non-2xx status codes
-      if (!response.ok) {
-        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
-        return;
-      }
-
-      const data = await response.json();
-
-      setCurrentLap(data["currentLap"]);
-
-    } catch (error) {
-      // Handles network errors, server down, CORS failures, JSON fail, etc.
-      console.error('Error fetching laps:', error);
-    }
-  };
-
-  const fetchCurrentTime = async () => {
-    try {
-      const response = await fetch(`http://localhost:8000/currentLapTime?vehicleID=${selectedVehicleID}`);
-
-      // Handle non-2xx status codes
-      if (!response.ok) {
-        console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
-        return;
-      }
-
-      const data = await response.json();
-
-      // Validate array shape
-      setCurrentTime(data["currentLapTime"]);
-
-    } catch (error) {
-      // Handles network errors, server down, CORS failures, JSON fail, etc.
-      console.error('Error fetching laps:', error);
+      setLaps([]); 
     }
   };
 
   const fetchVehicles = async () => {
     try {
-      const response = await fetch('http://localhost:8000/vehicles'); // Your endpoint
+      const response = await fetch('http://localhost:8000/vehicles');
       if (!response.ok) {
         throw new Error(`Failed to fetch vehicles. Status: ${response.status}`);
       }
-
       const data = await response.json();
-
-      // Validate that the data is an array of numbers (vehicle IDs)
       if (Array.isArray(data) && data.every((item: any) => typeof item === 'string')) {
-        setVehicles(data); // return the array of vehicle IDs
+        setVehicles(data);
       } else {
         throw new Error('Invalid vehicle data');
       }
-
     } catch (error: any) {
       console.error('Error fetching vehicles:', error);
-      setVehicles([]); // Return an empty array in case of error
+      setVehicles([]);
     }
   };
 
   const fetchInsight = async () => {
     try {
       const response = await fetch(`http://localhost:8000/driverInsight?vehicleID=${selectedVehicleID}`);
-
-      // Handle non-2xx status codes
       if (!response.ok) {
         console.error(`Lap fetch failed: ${response.status} ${response.statusText}`);
         return;
       }
-
       const data = await response.json();
-
-      const improvement_percent = data["improvement"];
-
-    //   // Threshold minimum improvement percent to deliver an insight
-    //   if (improvement_percent < 0.10)
-    //   {
-    //     return;
-    //   }
-
-      const sentence = `${data["driverInsight"]} 5s ago to save ${improvement_percent.toFixed(2)}s`;
-
+      const sentence = `${data["driverInsight"]} 5s ago to save ${data["improvement"].toFixed(2)}s`;
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],
         insight: sentence
-      }
-
-      // Validate array shape
+      };
       setLatestInsight(insight);
-
       setDriverInsightList(data.total_improvement_list ?? []);
-
     } catch (error) {
-      // Handles network errors, server down, CORS failures, JSON fail, etc.
-      console.error('Error fetching laps:', error);
+      console.error('Error fetching insights:', error);
     }
   };
 
   // ================ POLLING LOOPS ================
-
-  // Poll latest position of all cars
   const positionPollMs = 100;
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
       fetchVehicles();
-
-      // Only fetch latest laps if selectedVehicleID is not null
       if (selectedVehicleID !== null) {
         fetchLatestLaps();
-        fetchCurrentLap();
-        fetchCurrentTime();
       }
-
     }, positionPollMs);
-
-    // Fetch the first position right away
-    fetchLatestPosition();
-
-    // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
+  }, [selectedVehicleID]);
 
-
-  // Poll backend for driver insights
   const insightPollMs = 5000;
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -223,22 +134,19 @@ export default function App() {
         fetchInsight();
       }
     }, insightPollMs);
-
-    // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
+  }, [selectedVehicleID]);
 
   // ================ RETURN ================
-
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
-
+      
       {selectedVehicleID && (
         <LapDisplay
-          currentLap={currentLap} // Locked for now, should come from backend
-          currentTime={currentTime} // Current time for the lap is being mocked
-          laps={laps} // Mocked laps data until its added
+          currentLap={currentLap}
+          currentTime={currentTime}
+          laps={laps}
         />
       )}
 
@@ -261,30 +169,37 @@ export default function App() {
         scrollWheelZoom={true}
         style={{ height: '100vh', width: '100vw' }}
       >
-        {/* Use Satellite tiles */}
         <TileLayer
           attribution='&copy; <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online">Esri</a> contributors'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
 
-        {/* Display only the newest position as a marker */}
         {latestPositions && (
           <VehicleMarkers positions={latestPositions} showOption={showOption} selectedVehicleID={selectedVehicleID}/>
         )}
 
-        {/* Display driver insights on the track */}
-        {/* Modern styled marker for the latest driver insight */}
         {latestInsight && selectedVehicleID && (
           <CircleMarker
             center={latestInsight.startPosition}
-            radius={0} // Size of the circle
-            weight={0} // Border width
+            radius={0}
+            weight={0}
           >
             <Tooltip permanent>{latestInsight.insight}</Tooltip>
           </CircleMarker>
         )}
 
       </MapContainer>
+
+      {/* Popup Component */}
+      {showPopup && (
+        <div className="popup-overlay">
+          <div className="popup-container">
+            <h2>UBC Solar x Toyota Hack The Track DEMO</h2>
+            <p>Data shown is from <strong>Barber Motorsports Park Race 1</strong>, and is being replayed on a loop for demonstration purposes.</p>
+            <button className="close-button" onClick={closePopup}>Let's Go!</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
