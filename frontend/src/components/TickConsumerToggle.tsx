@@ -52,7 +52,7 @@ export default function TickConsumerToggle({ backendUrl = 'http://localhost:8000
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <label htmlFor="toggle-write" style={{ fontWeight: 600 }}>
-          Tick consumer
+          Data Collection
         </label>
         <input
           id="toggle-write"

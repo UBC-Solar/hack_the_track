@@ -5,7 +5,7 @@ import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
 import VehicleSelector from './components/VehicleSelector';
-
+import DriverInsightsList from './components/DriverInsightsList';
 
 // ================ CONSTANTS ================
 
@@ -34,12 +34,14 @@ export default function App() {
   const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
 
   // Vehicle selection
-  const [vehicles, setVehicles] = useState<Array<number>>([]);
-  const [selectedVehicleID, setSelectedVehicleID] = useState<number | null>(null);
+  const [vehicles, setVehicles] = useState<Array<string>>([]);
+  const [selectedVehicleID, setSelectedVehicleID] = useState<string | null>(null);
   const [showOption, setShowOption] = useState<'all' | 'primary'>('all');
 
   // Driver insights
   const [latestInsight, setLatestInsight] = useState<DriverInsight | null>(null);
+
+  const [driverInsightList, setDriverInsightList] = useState<Array<[string, number]>>([]);
 
 
   // ================ QUERY BACKEND ================
@@ -137,7 +139,7 @@ export default function App() {
       const data = await response.json();
 
       // Validate that the data is an array of numbers (vehicle IDs)
-      if (Array.isArray(data) && data.every((item: any) => typeof item === 'number')) {
+      if (Array.isArray(data) && data.every((item: any) => typeof item === 'string')) {
         setVehicles(data); // return the array of vehicle IDs
       } else {
         throw new Error('Invalid vehicle data');
@@ -151,7 +153,7 @@ export default function App() {
 
   const fetchInsight = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/driverInsightFake?vehicleID=${selectedVehicleID}`);
+      const response = await fetch(`http://localhost:8000/driverInsight?vehicleID=${selectedVehicleID}`);
 
       // Handle non-2xx status codes
       if (!response.ok) {
@@ -161,13 +163,25 @@ export default function App() {
 
       const data = await response.json();
 
+      const improvement_percent = data["improvement"];
+
+    //   // Threshold minimum improvement percent to deliver an insight
+    //   if (improvement_percent < 0.10)
+    //   {
+    //     return;
+    //   }
+
+      const sentence = `${data["driverInsight"]} 5s ago to save ${improvement_percent.toFixed(2)}s`;
+
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],
-        insight: data["driverInsight"]
+        insight: sentence
       }
 
       // Validate array shape
       setLatestInsight(insight);
+
+      setDriverInsightList(data.total_improvement_list ?? []);
 
     } catch (error) {
       // Handles network errors, server down, CORS failures, JSON fail, etc.
@@ -178,7 +192,7 @@ export default function App() {
   // ================ POLLING LOOPS ================
 
   // Poll latest position of all cars
-  const positionPollMs = 500;
+  const positionPollMs = 100;
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
@@ -202,7 +216,7 @@ export default function App() {
 
 
   // Poll backend for driver insights
-  const insightPollMs = 10000;
+  const insightPollMs = 5000;
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (selectedVehicleID !== null) {
@@ -226,6 +240,10 @@ export default function App() {
           currentTime={currentTime} // Current time for the lap is being mocked
           laps={laps} // Mocked laps data until its added
         />
+      )}
+
+      {selectedVehicleID && (
+        <DriverInsightsList insights={driverInsightList} />
       )}
 
       <VehicleSelector

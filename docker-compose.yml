@@ -67,7 +67,7 @@ services:
       GROUP_ID: tick-snapshots
       PG_DSN: postgresql://telemetry:telemetry@tickdb:5432/telemetry
       TICK_TABLE: telem_tick
-      TICK_SECS: "0.1"
+      TICK_SECS: "0.05"
       WIPE_ON_START: "true"          # do it at consumer startup
       WIPE_TABLES: "telem_tick"      # comma-separated if >1
       CONTROL_TOPIC: tick.control
@@ -83,6 +83,33 @@ services:
       timeout: 2s
       retries: 60
     restart: unless-stopped
+
+  replayer:
+    build:
+      context: ./replayer
+      dockerfile: Dockerfile
+    depends_on:
+      - redpanda
+      - tickdb
+      - tick-consumer
+    volumes:
+      - ./replayer/replayer_data:/app/replayer_data  # schema init
+    environment:
+      BROKER: redpanda:9092
+      TOPIC: telem.stream_fast.raw
+      RACE_NUMBER: "1"
+      TRACK_NAME: "barber"
+      SPEED: "1.0"
+      REPLAY_START_REL_S: "60.0"
+      EXCLUDE_VEHICLE_IDS: "GR86-004-78,GR86-013-80"
+#    healthcheck:
+#      # succeed when the broker answers metadata requests
+#      test: [ "CMD-SHELL", "rpk cluster info --brokers=localhost:9092 >/dev/null 2>&1" ]
+#      interval: 2s
+#      timeout: 2s
+#      retries: 60
+#    restart: unless-stopped
+
 
   adminer:
     image: adminer

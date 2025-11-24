@@ -4,7 +4,7 @@ import { CircleMarker, Tooltip } from 'react-leaflet';
 interface VehicleMarkersProps {
   positions: LatestPositions;
   showOption: 'primary' | 'all';
-  selectedVehicleID: number | null;
+  selectedVehicleID: string | null;
 }
 
 // Generate a consistent color from the vehicle ID
@@ -24,10 +24,13 @@ export default function VehicleMarkers({
 }: VehicleMarkersProps) {
   // Create separate arrays for selected and non-selected vehicles
   const nonSelectedVehicles = Object.entries(positions).filter(
-    ([vehicleID]) => showOption === 'all' && vehicleID !== String(selectedVehicleID)
+    ([vehicleID]) =>
+      showOption === 'all' &&
+      (selectedVehicleID === null || vehicleID !== selectedVehicleID)
   );
+
   const selectedVehicles = Object.entries(positions).filter(
-    ([vehicleID]) => vehicleID === String(selectedVehicleID)
+    ([vehicleID]) => selectedVehicleID !== null && vehicleID === selectedVehicleID
   );
 
   return (

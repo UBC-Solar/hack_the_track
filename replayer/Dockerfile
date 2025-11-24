@@ -6,9 +6,7 @@ WORKDIR /app
 
 # Copy the necessary files, including the telemetry module
 COPY pyproject.toml uv.lock ./
-COPY load_gps_data.py main.py ./
-COPY telemetry/ ./telemetry
-COPY inference ./inference
+COPY replayer.py  ./
 
 # Use uv to sync dependencies (no dev deps for production)
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -18,5 +16,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ENV PYTHONPATH=/app
 
 # Expose port and run the FastAPI app using uvicorn
-EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "replayer.py", "--skip-prompt"]

@@ -4,7 +4,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm; -- optional, handy later
 -- Wide table: one row per tick per vehicle, columns for telemetry names will be added at runtime
 CREATE TABLE IF NOT EXISTS telem_tick (
   ts          timestamptz NOT NULL,
-  vehicle_id  integer     NOT NULL,
+  vehicle_id  TEXT        NOT NULL,
   PRIMARY KEY (ts, vehicle_id)
 );
 

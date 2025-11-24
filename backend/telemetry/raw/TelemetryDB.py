@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import Optional, List
 from sqlalchemy import create_engine, text
 import pandas as pd
-from telemetry.raw import VehicleRaceRecord
-
+from backend.telemetry.raw.VehicleRaceRecord import VehicleRaceRecord
+import datetime as dt
 
 class TelemetryDB:
     """Database accessor for telemetry events and car race data."""
@@ -72,3 +72,56 @@ class TelemetryDB:
             vehicle_code=r["vehicle_code"],
             db=self,
         )
+
+    def load_tick_window(
+            self,
+            race: VehicleRaceRecord,
+            vehicle_id: int,
+            duration_s: float = 5.0,
+    ) -> pd.DataFrame:
+        """
+        Load ~`duration_s` seconds of fast-stream telemetry for one vehicle in one event.
+        Assumes columns:
+          - sample_time -> timestamp
+          - accx, accy, speed, gear, aps, nmot, pbrake_f, pbrake_r, vbox_lat, vbox_lon
+        """
+        # Define time window
+        end_time = dt.datetime.now(dt.timezone.utc)
+        start_time = end_time - dt.timedelta(seconds=duration_s)
+
+        query = text(
+            """
+            SELECT 
+                    accx_can,
+                    accy_can,
+                    speed,
+                    gear,
+                    aps,
+                    nmot,
+                    pbrake_f,
+                    pbrake_r,
+                    "VBOX_Lat_Min",
+                    "VBOX_Long_Minutes"
+            FROM telem_tick
+            WHERE vehicle_id = :vehicle_id
+              AND ts >= :start_time
+              AND ts
+                < :end_time
+            ORDER BY ts
+            """
+        )
+
+        df = pd.read_sql(
+            query,
+            engine,
+            params={
+                "vehicle_id": vehicle_id,
+                "start_time": start_time,
+                "end_time": end_time,
+            },
+        )
+
+        # Ensure time index is monotonic
+        df = df.sort_values("timestamp").set_index("timestamp")
+        return df
+

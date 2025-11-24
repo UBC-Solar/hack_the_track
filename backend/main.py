@@ -24,8 +24,11 @@ from sqlalchemy import create_engine, MetaData, Table, select, desc, text
 
 from confluent_kafka import Producer
 
+from typing import Dict, List, Tuple
+
 from load_gps_data import get_lap_gps_data, data_path
 
+from inference.insights import get_insights, ControlModification, make_predictor
 
 # -------------------------------------------------------------
 # FastAPI App Initialization
@@ -60,6 +63,44 @@ tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 # Kafka producer (initialized in startup event)
 producer: Producer | None = None
 
+
+predictor = make_predictor()
+
+control_modifications = [
+    ControlModification(
+        name="baseline",
+        apply=lambda df: df.copy(),
+    ),
+    ControlModification(
+        name="Brake 25% Less",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 0.75,
+            pbrake_r=df["pbrake_r"] * 0.75,
+        ),
+    ),
+
+    ControlModification(
+        name="Brake 25% More",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 1.25,
+            pbrake_r=df["pbrake_r"] * 1.25,
+        ),
+    ),
+    ControlModification(
+        name="Steer 5° More Left",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 5.0),
+    ),
+
+    ControlModification(
+        name="Steer 5° More Right",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 5.0),
+    )
+]
+
+# vehicle_insights Storage
+# -------------------------------
+
+vehicle_insights: Dict[str, List[Tuple[str, float]]] = {}  # vehicleID -> list of (driverInsight, improvement)
 
 # -------------------------------------------------------------
 # Routes: Basic
@@ -349,7 +390,7 @@ def get_latest_all_fake(
 
 @app.get("/driverInsightFake")
 def get_insight_fake(
-    vehicleID: int,
+    vehicleID: str,
 ):
     """
     Returns fake driver insights for testing
@@ -372,6 +413,80 @@ def get_insight_fake(
 
     return {"startLat": lat, "startLon": lon, "driverInsight": insight}
 
+# -------------------------------------------------------------
+# Insights
+# -------------------------------------------------------------
+
+@app.get("/driverInsight")
+def get_insight(
+    vehicleID: str,
+):
+    """
+    Returns driver insight for a vehicle and keeps a cumulative list
+    of insights for that vehicle in memory.
+    """
+    duration_s = 5.0
+
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
+
+    (
+        lat_true,
+        lon_true,
+        pred_results,
+        gates_with_intersections,
+        best_controls,
+        best_improvement_s,
+    ) = get_insights(
+        vehicleID,
+        duration_s,
+        control_modifications,
+        predictor=predictor,
+        engine=engine,
+    )
+
+    # Print best control(s) and time improvement
+    if best_improvement_s is not None and best_controls:
+        if len(best_controls) == 1:
+            insight = best_controls[0]
+            print(
+                f"\nBest control modification: {best_controls[0]} "
+                f"(Δt = {best_improvement_s:.3f} s vs baseline)"
+            )
+        else:
+            combo_str = " And ".join(best_controls)
+            insight = combo_str
+
+            print(
+                f"\nBest combined controls: {insight} "
+                f"(Δt = {best_improvement_s:.3f} s vs baseline)"
+            )
+    else:
+        insight = None
+        best_improvement_s = None
+        print("\nNo beneficial control modifications found.")
+
+    if best_improvement_s:
+        best_improvement = best_improvement_s * (-1.0)      # negative delta so make it positive to indicate time saved
+    
+    # --- Append to in-memory list ---
+    if vehicleID not in vehicle_insights:
+        vehicle_insights[vehicleID] = []
+
+    vehicle_insights[vehicleID].append((insight, best_improvement))
+
+    return {
+        "startLat": lat,
+        "startLon": lon,
+        "driverInsight": insight,
+        "improvement": best_improvement,
+        "total_improvement_list": vehicle_insights[vehicleID]
+    }
 
 # -------------------------------------------------------------
 # Kafka Events
