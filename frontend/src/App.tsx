@@ -162,7 +162,14 @@ export default function App() {
       const data = await response.json();
 
       const improvement_percent = data["improvement"] * 100
-      const sentence = `${data["driverInsight"]} to achieve ${improvement_percent}% time reduction`;
+
+      // // Threshold minimum improvement percent to deliver an insight
+      // if (improvement_percent < 5.0)
+      // {
+      //   return;
+      // }
+
+      const sentence = `${data["driverInsight"]} to achieve ${improvement_percent.toFixed(1)}% time reduction`;
 
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],
@@ -181,7 +188,7 @@ export default function App() {
   // ================ POLLING LOOPS ================
 
   // Poll latest position of all cars
-  const positionPollMs = 500;
+  const positionPollMs = 100;
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchLatestPosition();
