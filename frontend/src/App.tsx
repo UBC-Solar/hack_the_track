@@ -194,7 +194,7 @@ export default function App() {
       {showPopup && (
         <div className="popup-overlay">
           <div className="popup-container">
-            <h2>UBC Solar x Toyota Hack The Track DEMO</h2>
+            <h2>UBC Solar x Toyota Hack The Track</h2>
             <p>Data shown is from <strong>Barber Motorsports Park Race 1</strong>, and is being replayed on a loop.</p>
             <button className="close-button" onClick={closePopup}>Let's Go!</button>
           </div>
