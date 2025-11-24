@@ -10,7 +10,7 @@ import { BACKEND_URL } from './config';
 
 // ================ CONSTANTS ================
 
-const initialPosition: LatLngTuple = [33.5325017, -86.6215766];
+const initialPosition: LatLngTuple = [33.532463, -86.618345];
 
 // Map car IDs to their most recent position
 export interface LatestPositions {
@@ -45,6 +45,14 @@ export default function App() {
   const [driverInsightList, setDriverInsightList] = useState<Array<[string, number]>>([]);
 
 
+  // ================ POPUP STATE ================
+  const [showPopup, setShowPopup] = useState(true);
+
+  const closePopup = () => {
+    setShowPopup(false);
+  };
+
+  
   // ================ QUERY BACKEND ================
 
   const fetchLatestPosition = async () => {
@@ -286,6 +294,17 @@ export default function App() {
         )}
 
       </MapContainer>
+
+      {/* Popup Component */}
+      {showPopup && (
+        <div className="popup-overlay">
+          <div className="popup-container">
+            <h2>UBC Solar x Toyota Hack The Track</h2>
+            <p>Data shown is from <strong>Barber Motorsports Park Race 1</strong>, and is being replayed on a loop.</p>
+            <button className="close-button" onClick={closePopup}>Let's Go!</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
