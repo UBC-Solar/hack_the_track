@@ -15,6 +15,8 @@ import json
 import os
 from math import cos, sin, radians, pi
 from random import random
+import threading
+import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +24,7 @@ from pydantic import BaseModel
 
 from sqlalchemy import create_engine, MetaData, Table, select, desc, text
 
-from confluent_kafka import Producer
+from confluent_kafka import Producer, Consumer, KafkaError
 
 from typing import Dict, List, Tuple
 
@@ -50,7 +52,8 @@ TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
 
 BROKER = os.getenv("BROKER", "localhost:9092")
 CONTROL_TOPIC = os.getenv("CONTROL_TOPIC", "tick.control")
-
+DONE_TOPIC = os.getenv("DONE_TOPIC", "tick.done")
+DONE_GROUP_ID = os.getenv("DONE_GROUP_ID", "backend-done-listener")
 # -------------------------------------------------------------
 # Database Setup
 # -------------------------------------------------------------
@@ -60,7 +63,9 @@ tick_table = Table(TICK_TABLE, metadata, autoload_with=engine)
 
 # Kafka producer (initialized in startup event)
 producer: Producer | None = None
-
+done_consumer: Consumer | None = None
+done_thread: threading.Thread | None = None
+done_stop_event: threading.Event | None = None
 
 predictor = make_predictor()
 
@@ -467,8 +472,10 @@ def get_insight(
 # -------------------------------------------------------------
 @app.on_event("startup")
 def init_kafka():
-    """Initialize Kafka producer."""
-    global producer
+    """Initialize Kafka producer and replay-done consumer."""
+    global producer, done_consumer, done_thread, done_stop_event
+
+    # Producer
     try:
         producer = Producer({"bootstrap.servers": BROKER})
         print("[INFO] Kafka producer initialized")
@@ -476,16 +483,100 @@ def init_kafka():
         print(f"[WARN] Kafka producer init failed: {e}")
         producer = None
 
+    # Replay-done consumer
+    try:
+        done_consumer = Consumer(
+            {
+                "bootstrap.servers": BROKER,
+                "group.id": DONE_GROUP_ID,
+                "enable.auto.commit": True,
+                "auto.offset.reset": "latest",
+            }
+        )
+        done_consumer.subscribe([DONE_TOPIC])
+        print(
+            f"[INFO] DONE consumer subscribed to {DONE_TOPIC} "
+            f"(group {DONE_GROUP_ID})"
+        )
+
+        done_stop_event = threading.Event()
+        done_thread = threading.Thread(
+            target=_done_listener_loop,
+            name="done-listener",
+            daemon=True,
+        )
+        done_thread.start()
+        print("[INFO] DONE listener thread started")
+    except Exception as e:
+        print(f"[WARN] DONE consumer init failed: {e}")
+        done_consumer = None
+        done_thread = None
+        done_stop_event = None
+
 
 @app.on_event("shutdown")
 def flush_kafka():
-    """Flush Kafka producer on shutdown."""
+    """Flush Kafka producer and stop replay-done listener on shutdown."""
+    global done_consumer, done_thread, done_stop_event
+
+    # Stop done-listener thread
+    if done_stop_event is not None:
+        done_stop_event.set()
+
+    if done_thread is not None and done_thread.is_alive():
+        done_thread.join(timeout=5)
+
+    if done_consumer is not None:
+        try:
+            done_consumer.close()
+        except Exception:
+            pass
+
+    # Flush producer
     if producer:
         try:
             producer.flush(5)
         except Exception:
             pass
 
+def _done_listener_loop():
+    """
+    Background loop that listens for replay-done events and clears
+    in-memory vehicle_insights when they arrive.
+    """
+    global done_consumer, done_stop_event, vehicle_insights
+
+    if done_consumer is None or done_stop_event is None:
+        print("[DONE] listener not initialized; exiting thread")
+        return
+
+    print("[DONE] listener loop started")
+    while not done_stop_event.is_set():
+        try:
+            msg = done_consumer.poll(1.0)
+            if msg is None:
+                continue
+
+            if msg.error():
+                if msg.error().code() != KafkaError._PARTITION_EOF:
+                    print(f"[DONE] error: {msg.error()}")
+                continue
+
+            try:
+                payload = json.loads(msg.value())
+            except Exception:
+                payload = None
+
+            print(f"[DONE] received replay-done notification: {payload}")
+            vehicle_insights.clear()
+            print("[DONE] cleared in-memory vehicle_insights")
+
+        except Exception as e:
+            # avoid killing the thread on one bad message
+            print(f"[DONE] listener exception: {e}")
+            time.sleep(1.0)
+
+    print("[DONE] listener loop stopping")
 
 class TogglePayload(BaseModel):
     enable: bool

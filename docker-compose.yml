@@ -8,6 +8,8 @@ services:
       - PYTHONUNBUFFERED=1
       - PG_DSN=postgresql://telemetry:telemetry@tickdb:5432/telemetry
       - BROKER=redpanda:9092
+      - DONE_TOPIC=tick.done
+      - DONE_GROUP_ID=backend-done-listener
     depends_on:
       tickdb:
         condition: service_healthy
@@ -66,6 +68,7 @@ services:
     environment:
       BROKER: redpanda:9092
       TOPIC: telem.stream_fast.raw
+      DONE_TOPIC: tick.done
       GROUP_ID: tick-snapshots
       PG_DSN: postgresql://telemetry:telemetry@tickdb:5432/telemetry
       TICK_TABLE: telem_tick
@@ -93,6 +96,7 @@ services:
     environment:
       BROKER: redpanda:9092
       TOPIC: telem.stream_fast.raw
+      DONE_TOPIC: tick.done
       RACE_NUMBER: "1"
       TRACK_NAME: "barber"
       SPEED: "1.0"
