@@ -139,3 +139,25 @@ button:focus-visible {
   justify-content: space-between;
   margin-bottom: 5px;
 }
+
+/* Container for Driver Insights, positioned under the vehicle selector */
+.driver-insights {
+  position: absolute;
+  /* 20px (selector top) + ~80–90px selector height ≈ 120px */
+  top: 120px;       /* tweak this up/down to taste */
+  right: 20px;
+  z-index: 900;
+}
+
+/* Fixed-size box, same width as other ui-boxes, scrollable inside */
+.driver-insights .ui-box {
+  width: 250px;     /* matches .ui-box width */
+  max-height: 300px;  /* total height of the card */
+}
+
+/* Inner scroll area so the header stays pinned */
+.insights-scroll {
+  max-height: 260px;  /* 200px minus header + padding */
+  overflow-y: auto;
+  overflow-x: hidden;
+}

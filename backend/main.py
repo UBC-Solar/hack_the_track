@@ -473,7 +473,7 @@ def get_insight(
 
     if best_improvement_s:
         best_improvement = best_improvement_s * (-1.0)      # negative delta so make it positive to indicate time saved
-    
+
     # --- Append to in-memory list ---
     if vehicleID not in vehicle_insights:
         vehicle_insights[vehicleID] = []
