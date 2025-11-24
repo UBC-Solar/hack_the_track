@@ -34,10 +34,10 @@ export default function App() {
   const [driverInsightList, setDriverInsightList] = useState<Array<[string, number]>>([]);
 
   // ================ POPUP STATE ================
-  const [showPopup, setShowPopup] = useState(true); // Popup visibility state
+  const [showPopup, setShowPopup] = useState(true);
 
   const closePopup = () => {
-    setShowPopup(false); // Close the popup
+    setShowPopup(false);
   };
 
   // ================ QUERY BACKEND ================
