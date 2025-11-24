@@ -162,7 +162,7 @@ export default function App() {
 
       const data = await response.json();
 
-      const improvement_percent = data["improvement"] * 100
+      const improvement_percent = data["improvement"];
 
       // // Threshold minimum improvement percent to deliver an insight
       // if (improvement_percent < 5.0)
@@ -170,7 +170,7 @@ export default function App() {
       //   return;
       // }
 
-      const sentence = `${data["driverInsight"]} to achieve ${improvement_percent.toFixed(1)}% time reduction`;
+      const sentence = `${data["driverInsight"]} 5s ago to save ${improvement_percent.toFixed(1)}s`;
 
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],

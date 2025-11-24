@@ -77,23 +77,6 @@ control_modifications = [
         ),
     ),
 
-
-    ControlModification(
-        name="Brake 30% Less",
-        apply=lambda df: df.assign(
-            pbrake_f=df["pbrake_f"] * 0.70,
-            pbrake_r=df["pbrake_r"] * 0.70,
-        ),
-    ),
-
-    ControlModification(
-        name="Brake 40% Less",
-        apply=lambda df: df.assign(
-            pbrake_f=df["pbrake_f"] * 0.60,
-            pbrake_r=df["pbrake_r"] * 0.60,
-        ),
-    ),
-
     ControlModification(
         name="Brake 25% More",
         apply=lambda df: df.assign(
@@ -101,20 +84,11 @@ control_modifications = [
             pbrake_r=df["pbrake_r"] * 1.25,
         ),
     ),
-
     ControlModification(
         name="Steer 10° More Left",
         apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 10.0),
     ),
-    ControlModification(
-        name="Steer 5° More Left",
-        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 5.0),
-    ),
 
-    ControlModification(
-        name="Steer 10° More Right",
-        apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 10.0),
-    ),
     ControlModification(
         name="Steer 5° More Right",
         apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 5.0),
@@ -490,7 +464,7 @@ def get_insight(
         print("\nNo beneficial control modifications found.")
 
     if best_improvement_s:
-        best_improvement = best_improvement_s / duration_s
+        best_improvement = best_improvement_s * (-1.0)      # negative delta so make it positive to indicate time saved
 
     return {"startLat": lat, "startLon": lon, "driverInsight": insight, "improvement": best_improvement}
 
