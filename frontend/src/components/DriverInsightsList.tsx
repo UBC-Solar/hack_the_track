@@ -7,33 +7,24 @@ interface DriverInsightsListProps {
 
 export default function DriverInsightsList({ insights }: DriverInsightsListProps) {
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: '20%',
-        right: 10,
-        width: '17vw',
-        maxHeight: '60vh',
-        overflowY: 'auto',
-        backgroundColor: '#333',
-        color: 'white',
-        padding: '15px',
-        borderRadius: '10px',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-        fontSize: '14px',
-        lineHeight: 1.4,
-        zIndex: 2000,
-      }}
-    >
-      <h3 style={{ marginTop: 0 }}>Driver Insights (Over 5s Intervals)</h3>
-        <ul style={{ paddingLeft: '1em' }}>
-        {insights.slice().reverse().map(([text, improvement], idx) => (
-            <li key={idx}>
-            {/* Format to match: "<driverInsight> 5s ago to save <improvement>s" */}
-            {`${text} 5s ago to save ${improvement.toFixed(2)}s`}
-            </li>
-        ))}
-        </ul>
+    <div className="driver-insights">
+      <div className="ui-box">
+        <h4 className="ui-header">Driver Insights (Over 5s Intervals)</h4>
+
+        {/* Scrollable content area, header stays pinned */}
+        <div className="insights-scroll">
+          <ul style={{ paddingLeft: '1em', margin: 0 }}>
+            {insights
+              .slice()
+              .reverse()
+              .map(([text, improvement], idx) => (
+                <li key={idx}>
+                  {`${text} 5s ago to save ${improvement.toFixed(2)}s`}
+                </li>
+              ))}
+          </ul>
+        </div>
+      </div>
     </div>
-  );    
+  );
 }

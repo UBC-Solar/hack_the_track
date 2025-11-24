@@ -169,49 +169,47 @@ def main():
     start = dt.datetime.now(dt.timezone.utc)
     print(f"Streaming {nrows} rows (speed×{SPEED}) …")
 
-    for r in stream_rows(REPLAY_CSV):
-        # unpack row object (namedtuple-like)
-        vehicle_id = r.vehicle_id
-        telemetry_name = r.telemetry_name
-        telemetry_value = r.telemetry_value
-        ts = r.timestamp
-        rel_time = float(r.relative_time_s)
-        lap = r.lap if hasattr(r, "lap") else None
-        track = getattr(r, "track", TRACK_NAME)
-        race_number = getattr(r, "race_number", RACE_NUMBER)
+    while True:
+        for r in stream_rows(REPLAY_CSV):
+            # unpack row object (namedtuple-like)
+            vehicle_id = r.vehicle_id
+            telemetry_name = r.telemetry_name
+            telemetry_value = r.telemetry_value
+            ts = r.timestamp
+            rel_time = float(r.relative_time_s)
+            lap = r.lap if hasattr(r, "lap") else None
+            track = getattr(r, "track", TRACK_NAME)
+            race_number = getattr(r, "race_number", RACE_NUMBER)
 
-        # pacing: align so relative_time_s = elapsed time * SPEED
-        target_elapsed = rel_time / max(SPEED, 1e-9)
-        now_elapsed = (dt.datetime.now(dt.timezone.utc) - start).total_seconds()
-        delay = target_elapsed - now_elapsed
-        if delay > 0:
-            time.sleep(delay)
+            # pacing: align so relative_time_s = elapsed time * SPEED
+            target_elapsed = rel_time / max(SPEED, 1e-9)
+            now_elapsed = (dt.datetime.now(dt.timezone.utc) - start).total_seconds()
+            delay = target_elapsed - now_elapsed
+            if delay > 0:
+                time.sleep(delay)
 
-        payload = {
-            "vehicle_id": vehicle_id,
-            "race_number": race_number,
-            "telemetry_name": telemetry_name,
-            "telemetry_value": to_json_safe(telemetry_value),
-            "ts": to_json_safe(ts),
-            "relative_time_s": rel_time,
-            "track": track,
-            # We don't have a separate 'vehicle_number' column in the replay CSV;
-            # reuse vehicle_id for now. If you add a vehicle_number column in the
-            # CSV builder, you can swap it in here.
-            "vehicle_number": vehicle_id,
-            "lap": int(lap) if lap is not None and not pd.isna(lap) else None,
-        }
+            payload = {
+                "vehicle_id": vehicle_id,
+                "race_number": race_number,
+                "telemetry_name": telemetry_name,
+                "telemetry_value": to_json_safe(telemetry_value),
+                "ts": to_json_safe(ts),
+                "relative_time_s": rel_time,
+                "track": track,
+                # We don't have a separate 'vehicle_number' column in the replay CSV;
+                # reuse vehicle_id for now. If you add a vehicle_number column in the
+                # CSV builder, you can swap it in here.
+                "vehicle_number": vehicle_id,
+                "lap": int(lap) if lap is not None and not pd.isna(lap) else None,
+            }
 
-        producer.produce(
-            topic=TOPIC,
-            key=str(vehicle_id),  # preserves per-vehicle ordering
-            value=json.dumps(payload),
-            on_delivery=delivery_report,
-        )
-        producer.poll(0)
-
-    producer.flush()
-    print("Replay finished.")
+            producer.produce(
+                topic=TOPIC,
+                key=str(vehicle_id),  # preserves per-vehicle ordering
+                value=json.dumps(payload),
+                on_delivery=delivery_report,
+            )
+            producer.poll(0)
 
 
 if __name__ == "__main__":

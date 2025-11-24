@@ -17,6 +17,8 @@ services:
     container_name: vite-frontend
     ports:
       - "5173:80"
+    environment:
+      VITE_BACKEND_URL: ${VITE_BACKEND_URL}
     depends_on:
       - backend
 
@@ -54,10 +56,10 @@ services:
       retries: 30
     restart: unless-stopped
 
-  tick-consumer:
+  data-ingress:
     build:
-      context: ./backend
-      dockerfile: tick-consumer.Dockerfile
+      context: ./telemetry
+      dockerfile: Dockerfile
     depends_on:
       - redpanda
       - tickdb
@@ -76,12 +78,6 @@ services:
       CONTROL_TOPIC_REPLICATION: "1"
       CONTROL_TOPIC_COMPACT: "true"   # optional: compacted control topic
       BROKER_READY_TIMEOUT_SECS: "45"
-    healthcheck:
-      # succeed when the broker answers metadata requests
-      test: [ "CMD-SHELL", "rpk cluster info --brokers=localhost:9092 >/dev/null 2>&1" ]
-      interval: 2s
-      timeout: 2s
-      retries: 60
     restart: unless-stopped
 
   replayer:
@@ -91,7 +87,7 @@ services:
     depends_on:
       - redpanda
       - tickdb
-      - tick-consumer
+      - data-ingress
     volumes:
       - ./replayer/replayer_data:/app/replayer_data  # schema init
     environment:
@@ -102,13 +98,6 @@ services:
       SPEED: "1.0"
       REPLAY_START_REL_S: "60.0"
       EXCLUDE_VEHICLE_IDS: "GR86-004-78,GR86-013-80"
-#    healthcheck:
-#      # succeed when the broker answers metadata requests
-#      test: [ "CMD-SHELL", "rpk cluster info --brokers=localhost:9092 >/dev/null 2>&1" ]
-#      interval: 2s
-#      timeout: 2s
-#      retries: 60
-#    restart: unless-stopped
 
 
   adminer:

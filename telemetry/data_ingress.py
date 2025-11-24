@@ -13,14 +13,12 @@ from psycopg2 import sql
 BROKER = os.getenv("BROKER", "redpanda:9092")
 TOPIC = os.getenv("TOPIC", "telem.stream_fast.raw")
 GROUP_ID = os.getenv("GROUP_ID", "tick-snapshots")
-# Data topic creation config (for the main telemetry topic)
 DATA_TOPIC_CREATE = os.getenv("DATA_TOPIC_CREATE", "true").lower() == "true"
 DATA_TOPIC_PARTITIONS = int(os.getenv("DATA_TOPIC_PARTITIONS", "8"))
 DATA_TOPIC_REPLICATION = int(os.getenv("DATA_TOPIC_REPLICATION", "1"))
-
 PG_DSN = os.getenv(
     "PG_DSN",
-    "postgresql://telemetry:telemetry@tickdb:5434/telemetry",
+    "postgresql://telemetry:telemetry@tickdb:5432/telemetry",
 )
 TICK_TABLE = os.getenv("TICK_TABLE", "telem_tick")
 
