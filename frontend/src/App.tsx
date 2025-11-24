@@ -213,7 +213,7 @@ export default function App() {
 
 
   // Poll backend for driver insights
-  const insightPollMs = 10000;
+  const insightPollMs = 5000;
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (selectedVehicleID !== null) {
