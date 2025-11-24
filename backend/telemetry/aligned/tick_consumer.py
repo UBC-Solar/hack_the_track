@@ -13,6 +13,10 @@ from psycopg2 import sql
 BROKER = os.getenv("BROKER", "redpanda:9092")
 TOPIC = os.getenv("TOPIC", "telem.stream_fast.raw")
 GROUP_ID = os.getenv("GROUP_ID", "tick-snapshots")
+# Data topic creation config (for the main telemetry topic)
+DATA_TOPIC_CREATE = os.getenv("DATA_TOPIC_CREATE", "true").lower() == "true"
+DATA_TOPIC_PARTITIONS = int(os.getenv("DATA_TOPIC_PARTITIONS", "8"))
+DATA_TOPIC_REPLICATION = int(os.getenv("DATA_TOPIC_REPLICATION", "1"))
 
 PG_DSN = os.getenv(
     "PG_DSN",
@@ -55,10 +59,9 @@ ORIG_TS_COLUMN = "orig_ts"
 RTIME_COLUMN = "rtime"
 
 # caches: latest values per vehicle
-latest_by_vehicle: Dict[int, Dict[str, Optional[float]]] = {}
-latest_meta_by_vehicle: Dict[int, Dict[str, Optional[float]]] = {}
-latest_lap_by_vehicle: Dict[int, Optional[int]] = {}
-
+latest_by_vehicle: Dict[str, Dict[str, Optional[float]]] = {}
+latest_meta_by_vehicle: Dict[str, Dict[str, Optional[float]]] = {}
+latest_lap_by_vehicle: Dict[str, Optional[int]] = {}
 # signal names observed
 observed_names: Set[str] = set()
 
@@ -210,7 +213,7 @@ def ensure_signal_columns(conn, names: Set[str]):
 def upsert_tick(
     conn,
     tick_ts: dt.datetime,
-    vehicle_id: int,
+    vehicle_id: str,
     row: Dict[str, Optional[float]],
 ):
     """Insert/Upsert one row: (ts, vehicle_id, <telemetry columns...>)."""
@@ -309,7 +312,9 @@ def run():
     print(f"[config] TICK_SECS={TICK_SECS}")
 
     # 0) Ensure broker is ready and control topic exists
+    # 0) Ensure broker is ready and topics exist
     wait_for_broker(BROKER, timeout_s=BROKER_READY_TIMEOUT_SECS)
+
     if CONTROL_TOPIC_CREATE:
         ensure_topic(
             brokers=BROKER,
@@ -319,9 +324,20 @@ def run():
             compact=CONTROL_TOPIC_COMPACT,
         )
 
+    # NEW: ensure the data topic exists as well (non-compacted)
+    if DATA_TOPIC_CREATE:
+        ensure_topic(
+            brokers=BROKER,
+            name=TOPIC,
+            partitions=DATA_TOPIC_PARTITIONS,
+            replication=DATA_TOPIC_REPLICATION,
+            compact=False,
+        )
+
     # 1) Data & control consumers
     data_consumer = make_consumer(GROUP_ID, reset="earliest")
     data_consumer.subscribe([TOPIC])
+
     print(f"[data] subscribed to {TOPIC} (group {GROUP_ID})")
 
     ctrl_consumer = make_consumer(GROUP_ID + "-control", reset="latest")
@@ -360,7 +376,15 @@ def run():
                     try:
                         payload = json.loads(msg.value())
 
-                        vid = int(payload.get("vehicle_id"))
+                        vid_raw = payload.get("vehicle_id")
+                        if vid_raw is None:
+                            # no vehicle_id -> nothing to do
+                            continue
+
+                        # vehicle_id comes as a string code now (e.g. "GR86-022-13"),
+                        # but also handle older numeric IDs just in case:
+                        vid = str(vid_raw)
+
                         name = str(payload.get("telemetry_name"))
                         val = to_float_or_none(payload.get("telemetry_value"))
 
