@@ -26,8 +26,6 @@ from confluent_kafka import Producer
 
 from typing import Dict, List, Tuple
 
-from load_gps_data import get_lap_gps_data, data_path
-
 from inference.insights import get_insights, ControlModification, make_predictor
 
 # -------------------------------------------------------------
@@ -108,30 +106,6 @@ vehicle_insights: Dict[str, List[Tuple[str, float]]] = {}  # vehicleID -> list o
 @app.get("/")
 def read_root():
     return {"message": "Hello World!"}
-
-
-# -------------------------------------------------------------
-# Routes: GPS Lap Data
-# -------------------------------------------------------------
-@app.get("/laps/")
-def get_example_lap(lapNumber: int, samplePeriod: int = 1):
-    """
-    Returns down-sampled GPS data for a specific lap.
-    """
-    barber_path = (
-        data_path
-        / "barber-motorsports-park"
-        / "barber"
-        / "Race 1"
-        / "R1_barber_telemetry_data.csv"
-    )
-
-    lat_df, lon_df = get_lap_gps_data(barber_path, lapNumber, chunksize=100000)
-
-    lat_vals = lat_df["telemetry_value"][::samplePeriod]
-    lon_vals = lon_df["telemetry_value"][::samplePeriod]
-
-    return {"lat_vals": list(lat_vals), "lon_vals": list(lon_vals)}
 
 
 # -------------------------------------------------------------
