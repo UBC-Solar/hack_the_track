@@ -5,7 +5,6 @@ import TickConsumerToggle from './components/TickConsumerToggle';
 import VehicleMarkers from './components/VehicleMarkers';
 import LapDisplay from './components/LapsDisplay';
 import VehicleSelector from './components/VehicleSelector';
-import InsightsHeader from './components/InsightsHeader';
 import DriverInsightsList from './components/DriverInsightsList';
 
 // ================ CONSTANTS ================
@@ -234,8 +233,6 @@ export default function App() {
   return (
     <div>
       <TickConsumerToggle backendUrl="http://localhost:8000" />
-
-      <InsightsHeader />
 
       {selectedVehicleID && (
         <LapDisplay

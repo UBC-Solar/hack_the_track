@@ -11,7 +11,7 @@ export default function DriverInsightsList({ insights }: DriverInsightsListProps
       style={{
         position: 'fixed',
         top: '20%',
-        left: 10,
+        right: 10,
         width: '17vw',
         maxHeight: '60vh',
         overflowY: 'auto',
@@ -25,15 +25,15 @@ export default function DriverInsightsList({ insights }: DriverInsightsListProps
         zIndex: 2000,
       }}
     >
-      <h3 style={{ marginTop: 0 }}>Driver Insights</h3>
-      <ul style={{ paddingLeft: '1em' }}>
-        {insights.map(([text, improvement], idx) => (
-          <li key={idx}>
+      <h3 style={{ marginTop: 0 }}>Driver Insights (Over 5s Intervals)</h3>
+        <ul style={{ paddingLeft: '1em' }}>
+        {insights.slice().reverse().map(([text, improvement], idx) => (
+            <li key={idx}>
             {/* Format to match: "<driverInsight> 5s ago to save <improvement>s" */}
             {`${text} 5s ago to save ${improvement.toFixed(2)}s`}
-          </li>
+            </li>
         ))}
-      </ul>
+        </ul>
     </div>
-  );
+  );    
 }
