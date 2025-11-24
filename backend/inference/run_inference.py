@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from inference.prediction import prepare_tickdb_dataframe_for_model, CarTrajectoryPredictor
 from inference.models import MODEL_PATH
 from inference.constants import state, control
-from inference.evaluation import trajectory_to_state_positions, scoreState, gates
+from inference.evaluation import trajectory_to_state_positions, gates, score_modified_against_baseline
 from inference.evaluation.scoring import testIntersection
 
 
@@ -16,7 +16,7 @@ engine = create_engine(TICKDB_URL)
 
 def load_tick_window(
     engine,
-    vehicle_id: int,
+    vehicle_id: str,
     duration_s: float = 5.0,
 ) -> pd.DataFrame:
     """
@@ -71,7 +71,7 @@ def load_tick_window(
 
 # 2. Example usage: load window and run PathPredictor
 
-vehicle_id = 36
+vehicle_id = "GR86-040-3"
 
 df_window: pd.DataFrame = load_tick_window(engine, vehicle_id, duration_s=5.0)
 df_model = prepare_tickdb_dataframe_for_model(df_window, state, control)
@@ -164,7 +164,12 @@ for name, (lat_pred, lon_pred) in pred_results.items():
         df_window.index
     )
 
-    delta_t = scoreState(baseline_state, modified_state, gates)
+    delta_t = score_modified_against_baseline(
+        baseline_state,
+        modified_state,
+        gates
+    )
+
     print(f"{name}: {delta_t}")
 
     # record any gates this modified trajectory crosses

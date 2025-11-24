@@ -34,8 +34,8 @@ export default function App() {
   const [laps, setLaps] = useState<Array<{ number: number; time: number }>>([]);
 
   // Vehicle selection
-  const [vehicles, setVehicles] = useState<Array<number>>([]);
-  const [selectedVehicleID, setSelectedVehicleID] = useState<number | null>(null);
+  const [vehicles, setVehicles] = useState<Array<string>>([]);
+  const [selectedVehicleID, setSelectedVehicleID] = useState<string | null>(null);
   const [showOption, setShowOption] = useState<'all' | 'primary'>('all');
 
   // Driver insights
@@ -137,7 +137,7 @@ export default function App() {
       const data = await response.json();
 
       // Validate that the data is an array of numbers (vehicle IDs)
-      if (Array.isArray(data) && data.every((item: any) => typeof item === 'number')) {
+      if (Array.isArray(data) && data.every((item: any) => typeof item === 'string')) {
         setVehicles(data); // return the array of vehicle IDs
       } else {
         throw new Error('Invalid vehicle data');

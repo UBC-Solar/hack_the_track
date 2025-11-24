@@ -1,18 +1,18 @@
 import React from 'react';
 
 interface VehicleSelectorProps {
-  vehicleID: number | null;
+  vehicleID: string | null;
   showOption: 'all' | 'primary';
-  vehicles: Array<number>;
-  setVehicleID: (id: number | null) => void;
+  vehicles: Array<string>;
+  setVehicleID: (id: string | null) => void;
   setShowOption: (show: 'all' | 'primary') => void;
 }
 
 const VehicleSelector: React.FC<VehicleSelectorProps> = ({ vehicleID, showOption, vehicles, setVehicleID, setShowOption}) => {
 
   const handlePrimaryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = event.target.value ? parseInt(event.target.value, 10) : null;
-    setVehicleID(selectedId); // <-- Mutates parent state
+    const selectedId = event.target.value || null;  // keep as string
+    setVehicleID(selectedId);
   };
 
   const handleVisibilityChange = (event: React.ChangeEvent<HTMLSelectElement>) => {

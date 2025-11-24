@@ -32,6 +32,7 @@ TOPIC = os.getenv("TOPIC")
 RACE_NUMBER = int(os.getenv("RACE_NUMBER", "1"))
 TRACK_NAME = os.getenv("TRACK_NAME") or "unknown_track"
 SPEED = float(os.getenv("SPEED_MULTIPLIER", "1.0"))
+REPLAY_START_REL_S = float(os.getenv("REPLAY_START_REL_S", "60.0"))
 
 # NOTE: these are now *string* vehicle IDs (codes) matching the CSV, e.g. "GR86-022-13"
 VEHICLE_ID_ENV = os.getenv("VEHICLE_ID")
@@ -100,6 +101,9 @@ def get_time_bounds(csv_path: Path):
 
         if EXCLUDE_VEHICLE_IDS:
             chunk = chunk[~chunk["vehicle_id"].isin(EXCLUDE_VEHICLE_IDS)]
+
+        if REPLAY_START_REL_S > 0.0:
+            chunk = chunk[chunk["relative_time_s"] >= REPLAY_START_REL_S]
 
         if chunk.empty:
             continue

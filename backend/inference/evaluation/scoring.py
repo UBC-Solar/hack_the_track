@@ -74,6 +74,45 @@ def scoreState(originalState: list[StatePosition], modifiedState: list[StatePosi
         return modifiedTime - baseTime
     else: return "Never Crosses Gate"
 
-print(gates)
-#print(scoreState(originalState, modifiedState1, gates))
-#print(scoreState(originalState, modifiedState3, gates))
+
+def all_gate_intersections(state: list[StatePosition], gates: list[list]):
+    """
+    Return a list of (gate_index, time) for all gates crossed by the trajectory.
+    Order is based on trajectory time.
+    """
+    hits = []
+    initialTime = state[0].time
+
+    for i in range(len(state) - 1):
+        p1 = [state[i].x, state[i].y]
+        p2 = [state[i+1].x, state[i+1].y]
+        seg = [p1, p2]
+
+        for gi, gate in enumerate(gates):
+            if intersect(gate, seg):
+                t = state[i].time - initialTime
+                hits.append((gi, t))
+    return hits
+
+def score_modified_against_baseline(baseline_state, modified_state, gates):
+    """
+    Compare modified trajectory to baseline using the LAST gate baseline reaches.
+    Returns:
+        Δt = modified_time - baseline_time    (negative = improvement)
+        or "Never Crosses Gate"
+    """
+    baseline_hits = all_gate_intersections(baseline_state, gates)
+
+    if len(baseline_hits) == 0:
+        return "Baseline never crosses a gate"
+
+    # Last gate baseline intersects
+    last_gate_index, baseline_time = baseline_hits[-1]
+
+    # When does modified reach the same gate?
+    modified_time = testIntersection(modified_state, gates[last_gate_index])
+
+    if modified_time is None:
+        return "Never Crosses Gate"
+
+    return modified_time - baseline_time
