@@ -166,13 +166,13 @@ export default function App() {
 
       const improvement_percent = data["improvement"];
 
-      // // Threshold minimum improvement percent to deliver an insight
-      // if (improvement_percent < 5.0)
-      // {
-      //   return;
-      // }
+    //   // Threshold minimum improvement percent to deliver an insight
+    //   if (improvement_percent < 0.10)
+    //   {
+    //     return;
+    //   }
 
-      const sentence = `${data["driverInsight"]} 5s ago to save ${improvement_percent.toFixed(1)}s`;
+      const sentence = `${data["driverInsight"]} 5s ago to save ${improvement_percent.toFixed(2)}s`;
 
       const insight: DriverInsight = {
         startPosition: [data["startLat"], data["startLon"]],

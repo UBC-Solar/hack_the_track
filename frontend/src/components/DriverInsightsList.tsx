@@ -30,7 +30,7 @@ export default function DriverInsightsList({ insights }: DriverInsightsListProps
         {insights.map(([text, improvement], idx) => (
           <li key={idx}>
             {/* Format to match: "<driverInsight> 5s ago to save <improvement>s" */}
-            {`${text} 5s ago to save ${improvement.toFixed(1)}s`}
+            {`${text} 5s ago to save ${improvement.toFixed(2)}s`}
           </li>
         ))}
       </ul>
