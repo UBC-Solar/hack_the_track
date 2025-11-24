@@ -76,14 +76,24 @@ control_modifications = [
             pbrake_r=df["pbrake_r"] * 0.75,
         ),
     ),
+
+
     ControlModification(
-        name="Gear Up",
-        apply=lambda df: df.assign(gear=df["gear"] + 1),
+        name="Brake 30% Less",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 0.70,
+            pbrake_r=df["pbrake_r"] * 0.70,
+        ),
     ),
+    
     ControlModification(
-        name="Gear Down",
-        apply=lambda df: df.assign(gear=df["gear"] - 1),
+        name="Brake 40% Less",
+        apply=lambda df: df.assign(
+            pbrake_f=df["pbrake_f"] * 0.60,
+            pbrake_r=df["pbrake_r"] * 0.60,
+        ),
     ),
+
     ControlModification(
         name="Brake 25% More",
         apply=lambda df: df.assign(
@@ -91,16 +101,22 @@ control_modifications = [
             pbrake_r=df["pbrake_r"] * 1.25,
         ),
     ),
+
     ControlModification(
-        name="Double Steering Angle",
-        apply=lambda df: df.assign(steering_angle=df["steering_angle"] * 2.0),
+        name="Steer 10° More Left",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 10.0),
     ),
     ControlModification(
-        name="Steer 5deg Left",
+        name="Steer 5° More Left",
         apply=lambda df: df.assign(steering_angle=df["steering_angle"] + 5.0),
     ),
+
     ControlModification(
-        name="Steer 5deg Right",
+        name="Steer 10° More Right",
+        apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 10.0),
+    )
+    ControlModification(
+        name="Steer 5° More Right",
         apply=lambda df: df.assign(steering_angle=df["steering_angle"] - 5.0),
     )
 ]

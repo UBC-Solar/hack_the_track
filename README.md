@@ -31,4 +31,9 @@ To run the FastAPI backend:
 * This model is then used to deliver insights on how the driver varying control inputs could improve race performance. Using our industry knowledge of how drivers think, we developed a list of potential variations a driver could undertake at the moment and we report if any variation would result in a significant improvement on race performance.
 
 
+### REMOVE THIS LATER
+* `cd backend/`
+* `uv run ./telemetry/replayer/replayer.py --skip-prompt`
+
+
 The page will automatically update when changes to the React frontend (e.g., `App.jsx`) are made.
