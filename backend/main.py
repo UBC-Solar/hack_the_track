@@ -349,7 +349,7 @@ def get_latest_all_fake(
 
 @app.get("/driverInsightFake")
 def get_insight_fake(
-    vehicleID: int,
+    vehicleID: str,
 ):
     """
     Returns fake driver insights for testing
