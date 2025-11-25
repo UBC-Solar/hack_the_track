@@ -39,6 +39,8 @@ EXCLUDE_VEHICLE_IDS = [
 if EXCLUDE_VEHICLE_IDS:
     print(f"[filter] excluding vehicle_ids (codes): {EXCLUDE_VEHICLE_IDS}")
 
+DONE_TOPIC = os.getenv("DONE_TOPIC", "tick.done")
+
 # Where the replay CSV lives (same folder as this script)
 BASE_DIR = Path(__file__).parent
 REPLAY_CSV = BASE_DIR / "replayer_data" / f"replay_ready_r{RACE_NUMBER}_{TRACK_NAME}.csv"
@@ -210,6 +212,24 @@ def main():
                 on_delivery=delivery_report,
             )
             producer.poll(0)
+
+        done_payload = {
+            "event": "replay_done",
+            "race_number": RACE_NUMBER,
+            "track": TRACK_NAME,
+            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
+        }
+        producer.produce(
+            topic=DONE_TOPIC,
+            key="replayer",
+            value=json.dumps(done_payload),
+            on_delivery=delivery_report,
+        )
+        producer.flush()
+        print(f"[replayer] sent done message to {DONE_TOPIC}")
+
+        # tiny pause to give the consumer time to wipe
+        time.sleep(5.0)
 
 
 if __name__ == "__main__":

@@ -160,6 +160,44 @@ export default function App() {
     }
   };
 
+  const fetchRaceState = async () => {
+    if (!selectedVehicleID) return;
+
+    try {
+      const response = await fetch(
+        `${BACKEND_URL}/raceState?vehicleID=${selectedVehicleID}`
+      );
+
+      if (!response.ok) {
+        console.error(
+          `Race state fetch failed: ${response.status} ${response.statusText}`
+        );
+        return;
+      }
+
+      const data = await response.json();
+
+      // laps
+      if (Array.isArray(data.laps)) {
+        setLaps(data.laps);
+      } else {
+        console.error("raceState.laps is not an array:", data.laps);
+        setLaps([]);
+      }
+
+      // current lap + time
+      if (typeof data.currentLap === "number") {
+        setCurrentLap(data.currentLap);
+      }
+      if (typeof data.currentLapTime === "number") {
+        setCurrentTime(data.currentLapTime);
+      }
+    } catch (error) {
+      console.error("Error fetching race state:", error);
+      // keep previous state on error
+    }
+  };
+
   const fetchInsight = async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/driverInsight?vehicleID=${selectedVehicleID}`);
@@ -200,29 +238,31 @@ export default function App() {
 
   // ================ POLLING LOOPS ================
 
-  // Poll latest position of all cars
-  const positionPollMs = 100;
+  const positionPollMs = 75;
   useEffect(() => {
-    const intervalId = setInterval(() => {
+    const poll = () => {
       fetchLatestPosition();
-      fetchVehicles();
 
-      // Only fetch latest laps if selectedVehicleID is not null
       if (selectedVehicleID !== null) {
-        fetchLatestLaps();
-        fetchCurrentLap();
-        fetchCurrentTime();
+        fetchRaceState();
       }
+    };
 
-    }, positionPollMs);
+    poll();
 
-    // Fetch the first position right away
-    fetchLatestPosition();
+    const intervalId = setInterval(poll, positionPollMs);
 
-    // Cleanup polling on component unmount
     return () => clearInterval(intervalId);
-  }, [selectedVehicleID]); // Add selectedVehicleID as a dependency
+  }, [selectedVehicleID]);
 
+  const vehiclePollRate = 5000;
+  useEffect(() => {
+    fetchVehicles();
+
+    // If you want periodic refresh, uncomment:
+    const intervalId = setInterval(fetchVehicles, vehiclePollRate);
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Poll backend for driver insights
   const insightPollMs = 5000;

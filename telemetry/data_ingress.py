@@ -42,6 +42,11 @@ BROKER_READY_TIMEOUT_SECS = float(
     os.getenv("BROKER_READY_TIMEOUT_SECS", "45")
 )
 
+DONE_TOPIC = os.getenv("DONE_TOPIC", "tick.done")
+DONE_TOPIC_CREATE = os.getenv("DONE_TOPIC_CREATE", "true").lower() == "true"
+DONE_TOPIC_PARTITIONS = int(os.getenv("DONE_TOPIC_PARTITIONS", "1"))
+DONE_TOPIC_REPLICATION = int(os.getenv("DONE_TOPIC_REPLICATION", "1"))
+
 WRITE_ENABLED = False
 
 WIPE_ON_START = os.getenv("WIPE_ON_START", "false").lower() == "true"
@@ -79,6 +84,18 @@ def to_int_or_none(v):
         return int(float(v))
     except Exception:
         return None
+
+def wipe_tables(conn):
+    """Truncate all tables listed in WIPE_TABLES."""
+    if not WIPE_TABLES:
+        print("[wipe] WIPE_TABLES is empty; nothing to truncate")
+        return
+
+    with conn.cursor() as cur:
+        for t in WIPE_TABLES:
+            cur.execute(f'TRUNCATE TABLE "{t}" RESTART IDENTITY')
+            print(f"[wipe] truncated {t}")
+    conn.commit()
 
 
 def wait_for_broker(brokers: str, timeout_s: float = 30.0) -> None:
@@ -299,6 +316,26 @@ def poll_control(ctrl_consumer) -> None:
     except Exception as e:
         print(f"[control] bad control message: {e}")
 
+def poll_done(done_consumer, conn) -> None:
+    """
+    Poll done topic; on any message, wipe the tick tables.
+    """
+    msg = done_consumer.poll(timeout=0.0)
+    if not msg:
+        return
+    if msg.error():
+        if msg.error().code() != KafkaError._PARTITION_EOF:
+            print(f"[done] error: {msg.error()}")
+        return
+
+    try:
+        payload = json.loads(msg.value())
+    except Exception:
+        payload = None
+
+    print(f"[done] received replay-done notification: {payload}")
+    wipe_tables(conn)
+
 
 # --- Main loop ----------------------------------------------------------------
 def run():
@@ -308,6 +345,8 @@ def run():
     print(f"[config] PG_DSN={PG_DSN}")
     print(f"[config] TICK_TABLE={TICK_TABLE}")
     print(f"[config] TICK_SECS={TICK_SECS}")
+    print(f"[config] CONTROL TOPIC={CONTROL_TOPIC}")
+    print(f"[config] DONE TOPIC={DONE_TOPIC}")
 
     # 0) Ensure broker is ready and control topic exists
     # 0) Ensure broker is ready and topics exist
@@ -322,13 +361,21 @@ def run():
             compact=CONTROL_TOPIC_COMPACT,
         )
 
-    # NEW: ensure the data topic exists as well (non-compacted)
     if DATA_TOPIC_CREATE:
         ensure_topic(
             brokers=BROKER,
             name=TOPIC,
             partitions=DATA_TOPIC_PARTITIONS,
             replication=DATA_TOPIC_REPLICATION,
+            compact=False,
+        )
+
+    if DONE_TOPIC_CREATE:
+        ensure_topic(
+            brokers=BROKER,
+            name=DONE_TOPIC,
+            partitions=DONE_TOPIC_PARTITIONS,
+            replication=DONE_TOPIC_REPLICATION,
             compact=False,
         )
 
@@ -342,16 +389,16 @@ def run():
     ctrl_consumer.subscribe([CONTROL_TOPIC])
     print(f"[control] subscribed to {CONTROL_TOPIC} (group {GROUP_ID}-control)")
 
+    done_consumer = make_consumer(GROUP_ID + "-done", reset="latest")
+    done_consumer.subscribe([DONE_TOPIC])
+    print(f"[done] subscribed to {DONE_TOPIC} (group {GROUP_ID}-done)")
+
     # 2) Postgres
     conn = psycopg2.connect(PG_DSN)
     conn.autocommit = False
 
     if WIPE_ON_START:
-        with conn.cursor() as cur:
-            for t in WIPE_TABLES:
-                cur.execute(f'TRUNCATE TABLE "{t}" RESTART IDENTITY')
-                print(f"[wipe] truncated {t}")
-        conn.commit()
+        wipe_tables(conn)
 
     ensure_schema(conn)
 
@@ -362,6 +409,8 @@ def run():
         while True:
             # control first
             poll_control(ctrl_consumer)
+
+            poll_done(done_consumer, conn)
 
             # data poll
             msg = data_consumer.poll(timeout=0.01)
@@ -458,6 +507,7 @@ def run():
     finally:
         data_consumer.close()
         ctrl_consumer.close()
+        done_consumer.close()
         conn.close()
 
 
