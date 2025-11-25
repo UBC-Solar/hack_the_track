@@ -329,6 +329,25 @@ def get_latest_all():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/raceState")
+def get_race_state(vehicleID: str):
+    """
+    Combined endpoint that returns:
+      - laps (excluding current lap)
+      - currentLap
+      - currentLapTime
+    for a given vehicleID.
+    """
+    # Reuse existing endpoint logic to minimize risk
+    laps = get_current_laps(vehicleID)
+    current_lap = get_current_lap(vehicleID)
+    current_lap_time = get_current_lap_time(vehicleID)
+
+    return {
+        "laps": laps,
+        "currentLap": current_lap["currentLap"],
+        "currentLapTime": current_lap_time["currentLapTime"],
+    }
 
 # -------------------------------------------------------------
 # Dummy Functions
@@ -406,14 +425,6 @@ def get_insight(
     """
     duration_s = 5.0
 
-    try:
-        all_positions = get_latest_all()
-        lat = all_positions[vehicleID][0]
-        lon = all_positions[vehicleID][1]
-    except:
-        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
-        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
-
     (
         lat_true,
         lon_true,
@@ -458,6 +469,14 @@ def get_insight(
         vehicle_insights[vehicleID] = []
 
     vehicle_insights[vehicleID].append((insight, best_improvement))
+
+    try:
+        all_positions = get_latest_all()
+        lat = all_positions[vehicleID][0]
+        lon = all_positions[vehicleID][1]
+    except:
+        lat = 33.5297157 + random() * (33.5348805 - 33.5297157)
+        lon = -86.6153219 + random() * (-86.6238813 - -86.6153219)
 
     return {
         "startLat": lat,
