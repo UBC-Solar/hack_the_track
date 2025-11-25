@@ -5,6 +5,7 @@ UBC Solar's submission for Hack the Track Presented by Toyota GR
 
 ## For Hackathon Judges
 Our deployed app is available at the link provided in our submission.
+
 Simply follow the link to view the app running with Barber Motorsports Park Race 1 data played on a loop
 
 ## Running Locally
